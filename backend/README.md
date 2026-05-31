@@ -31,17 +31,24 @@ python manage.py runserver 0.0.0.0:8000
 
 Crear un **Web Service** en Render apuntando al repositorio y configurar:
 
-- Root Directory: `backend`
+- Root Directory: dejar vacio o usar `.`
 - Runtime: `Python`
 - Build Command:
 
 ```bash
-pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+bash build.sh
 ```
 
 - Start Command:
 
 ```bash
+bash start.sh
+```
+
+Tambien funciona con Root Directory `backend`, pero en ese caso los comandos son:
+
+```bash
+pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
 gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
 ```
 
@@ -55,7 +62,7 @@ DJANGO_ALLOWED_HOSTS=TU_BACKEND.onrender.com
 DJANGO_CORS_ALLOWED_ORIGINS=https://TU_FRONTEND.vercel.app
 DJANGO_CSRF_TRUSTED_ORIGINS=https://TU_FRONTEND.vercel.app,https://TU_BACKEND.onrender.com
 
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DB?sslmode=require
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=require
 DB_CONN_MAX_AGE=60
 DB_SSL_REQUIRE=true
 
@@ -90,6 +97,18 @@ MERCADOPAGO_WEBHOOK_SECRET=
 Notas:
 
 - `DATABASE_URL` puede salir de Neon, Supabase o Render Postgres. Si usas Neon, copia el connection string de PostgreSQL.
+- Para esta base Neon, usar uno de estos formatos en Render:
+
+```env
+DATABASE_URL=postgresql://neondb_owner:<PASSWORD>@ep-red-grass-acu4hk7f.sa-east-1.aws.neon.tech/neondb?sslmode=require
+```
+
+o con pooler:
+
+```env
+DATABASE_URL=postgresql://neondb_owner:<PASSWORD>@ep-red-grass-acu4hk7f-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require
+```
+
 - El filesystem de Render Free es efimero: logos/media subidos desde la app pueden perderse en redeploy. Para produccion conviene Cloudinary/S3.
 - Luego de publicar el backend, en el frontend configurar `VITE_API_BASE_URL=https://TU_BACKEND.onrender.com/api`.
 
