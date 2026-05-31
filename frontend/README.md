@@ -15,7 +15,7 @@ Frontend React para AutoFlow.
 ## Inicio rapido
 
 ```powershell
-cd C:\AutoFlow\frontend
+cd C:\GitHub\AutoFlow\frontend
 npm.cmd install
 npm.cmd run dev -- --port 5173
 ```
@@ -29,8 +29,27 @@ http://localhost:5173
 La API usada por defecto esta configurada en `.env`:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8000/api
+VITE_API_BASE_URL=https://autoflow-jl6p.onrender.com/api
 ```
+
+## Cloudflare Pages
+
+Configurar el proyecto con:
+
+```text
+Root directory: frontend
+Build command: npm run build
+Deploy command: npx wrangler pages deploy dist --project-name=autoflow
+Build output directory: dist
+```
+
+Variable de entorno en Cloudflare:
+
+```env
+VITE_API_BASE_URL=https://autoflow-jl6p.onrender.com/api
+```
+
+El archivo `public/_redirects` permite refrescar rutas de React Router como `/dashboard`, `/clients` o `/billing`.
 
 Pantallas implementadas:
 
@@ -55,5 +74,5 @@ npm.cmd run build
 La salida queda en:
 
 ```text
-C:\AutoFlow\frontend\dist
+C:\GitHub\AutoFlow\frontend\dist
 ```
