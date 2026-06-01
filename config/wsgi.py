@@ -9,7 +9,11 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
+current = os.getenv("DJANGO_SETTINGS_MODULE", "")
+if current in {"", "config.settings.local"}:
+    os.environ["DJANGO_SETTINGS_MODULE"] = "config.settings.production"
+else:
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 
 from django.core.wsgi import get_wsgi_application
 

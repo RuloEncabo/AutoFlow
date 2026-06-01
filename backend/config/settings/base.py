@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dj_database_url
 from dotenv import load_dotenv
@@ -30,6 +31,13 @@ def env_list(name: str, default: str = "") -> list[str]:
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-autoflow-development-key")
 DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+for candidate_host in (
+    os.getenv("RENDER_EXTERNAL_HOSTNAME", ""),
+    urlparse(os.getenv("BACKEND_PUBLIC_URL", "")).netloc,
+):
+    if candidate_host and candidate_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(candidate_host)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
