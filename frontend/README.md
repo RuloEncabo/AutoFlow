@@ -49,7 +49,7 @@ Variable de entorno en Cloudflare:
 VITE_API_BASE_URL=https://autoflow-jl6p.onrender.com/api
 ```
 
-El archivo `wrangler.toml` publica `dist` como assets y usa `not_found_handling = "single-page-application"` para que rutas de React Router como `/login`, `/dashboard`, `/clients` o `/billing` funcionen al refrescar o abrir directo desde celular.
+El archivo `wrangler.toml` publica `dist` como assets y usa `not_found_handling = "single-page-application"` para que rutas de React Router como `/login`, `/dashboard`, `/clients` o `/billing` funcionen al refrescar o abrir directo desde celular. No usar `public/_redirects` en Workers porque Cloudflare lo interpreta como regla de redirect y puede generar bucles.
 
 Pantallas implementadas:
 
