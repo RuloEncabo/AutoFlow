@@ -32,14 +32,14 @@ La API usada por defecto esta configurada en `.env`:
 VITE_API_BASE_URL=https://autoflow-jl6p.onrender.com/api
 ```
 
-## Cloudflare Pages
+## Cloudflare Workers
 
 Configurar el proyecto con:
 
 ```text
 Root directory: frontend
 Build command: npm run build
-Deploy command: npx wrangler pages deploy dist --project-name=autoflow
+Deploy command: npx wrangler deploy
 Build output directory: dist
 ```
 
@@ -49,7 +49,7 @@ Variable de entorno en Cloudflare:
 VITE_API_BASE_URL=https://autoflow-jl6p.onrender.com/api
 ```
 
-El archivo `public/_redirects` permite refrescar rutas de React Router como `/dashboard`, `/clients` o `/billing`.
+El archivo `wrangler.toml` publica `dist` como assets y usa `not_found_handling = "single-page-application"` para que rutas de React Router como `/login`, `/dashboard`, `/clients` o `/billing` funcionen al refrescar o abrir directo desde celular.
 
 Pantallas implementadas:
 
