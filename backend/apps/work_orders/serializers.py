@@ -20,6 +20,7 @@ class TaskTemplateSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "estimated_minutes",
+            "labor_cost",
             "status",
             "created_at",
             "updated_at",
@@ -35,6 +36,11 @@ class TaskTemplateSerializer(serializers.ModelSerializer):
     def validate_estimated_minutes(self, value):
         if value <= 0:
             raise serializers.ValidationError("El tiempo previsto debe ser mayor a cero.")
+        return value
+
+    def validate_labor_cost(self, value):
+        if value < 0:
+            raise serializers.ValidationError("El costo de mano de obra no puede ser negativo.")
         return value
 
 
@@ -63,6 +69,7 @@ class WorkOrderTaskSerializer(serializers.ModelSerializer):
             "sector",
             "execution_order",
             "estimated_minutes",
+            "labor_cost",
             "estimated_date",
             "started_at",
             "finished_at",
@@ -107,6 +114,8 @@ class WorkOrderTaskSerializer(serializers.ModelSerializer):
             validated_data["description"] = task_template.description
         if not validated_data.get("estimated_minutes"):
             validated_data["estimated_minutes"] = task_template.estimated_minutes
+        if not validated_data.get("labor_cost"):
+            validated_data["labor_cost"] = task_template.labor_cost
         return validated_data
 
     def create(self, validated_data):
@@ -123,6 +132,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     tasks_completed = serializers.IntegerField(read_only=True)
     tasks_pending = serializers.SerializerMethodField()
     progress_percent = serializers.IntegerField(read_only=True)
+    labor_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    materials_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    parts_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    subtotal_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = WorkOrder
@@ -145,6 +158,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "tasks_completed",
             "tasks_pending",
             "progress_percent",
+            "labor_amount",
+            "materials_amount",
+            "parts_amount",
+            "subtotal_amount",
             "created_at",
             "updated_at",
         )
@@ -157,6 +174,10 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             "tasks_completed",
             "tasks_pending",
             "progress_percent",
+            "labor_amount",
+            "materials_amount",
+            "parts_amount",
+            "subtotal_amount",
             "created_at",
             "updated_at",
         )

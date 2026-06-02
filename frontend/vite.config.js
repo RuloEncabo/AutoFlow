@@ -1,8 +1,22 @@
 import react from "@vitejs/plugin-react";
+import { existsSync, rmSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
+function removeCloudflareRedirects() {
+  return {
+    name: "remove-cloudflare-redirects",
+    closeBundle() {
+      const redirectsPath = resolve(process.cwd(), "dist", "_redirects");
+      if (existsSync(redirectsPath)) {
+        rmSync(redirectsPath, { force: true });
+      }
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), removeCloudflareRedirects()],
   build: {
     rollupOptions: {
       onwarn(warning, warn) {
@@ -21,4 +35,3 @@ export default defineConfig({
     },
   },
 });
-

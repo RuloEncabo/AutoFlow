@@ -39,9 +39,13 @@ import StatusChip from "../../components/StatusChip.jsx";
 const emptyTask = {
   name: "",
   description: "",
-  estimated_minutes: 60,
+  estimated_hours: 1,
+  estimated_minutes_part: 0,
+  labor_cost: "0.00",
   status: "active",
 };
+
+const moneyFormatter = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
 
 function formatMinutes(minutes) {
   const value = Number(minutes || 0);
@@ -49,6 +53,25 @@ function formatMinutes(minutes) {
   const hours = Math.floor(value / 60);
   const remaining = value % 60;
   return remaining ? `${hours} h ${remaining} min` : `${hours} h`;
+}
+
+function splitMinutes(minutes) {
+  const value = Number(minutes || 0);
+  return {
+    estimated_hours: Math.floor(value / 60),
+    estimated_minutes_part: value % 60,
+  };
+}
+
+function buildTaskPayload(form) {
+  const estimated_minutes = Number(form.estimated_hours || 0) * 60 + Number(form.estimated_minutes_part || 0);
+  return {
+    name: form.name,
+    description: form.description,
+    estimated_minutes,
+    labor_cost: form.labor_cost,
+    status: form.status,
+  };
 }
 
 export default function TasksPage() {
@@ -72,7 +95,10 @@ export default function TasksPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: () => (editing ? updateTask(editing.id, form) : createTask(form)),
+    mutationFn: () => {
+      const payload = buildTaskPayload(form);
+      return editing ? updateTask(editing.id, payload) : createTask(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-catalog"] });
       closeDialog();
@@ -97,11 +123,14 @@ export default function TasksPage() {
   };
 
   const openEdit = (task) => {
+    const duration = splitMinutes(task.estimated_minutes);
     setEditing(task);
     setForm({
       name: task.name || "",
       description: task.description || "",
-      estimated_minutes: task.estimated_minutes || 60,
+      estimated_hours: duration.estimated_hours,
+      estimated_minutes_part: duration.estimated_minutes_part,
+      labor_cost: task.labor_cost || "0.00",
       status: task.status || "active",
     });
     setDialogOpen(true);
@@ -115,7 +144,8 @@ export default function TasksPage() {
   };
 
   const updateForm = (field) => (event) => {
-    setForm((current) => ({ ...current, [field]: field === "estimated_minutes" ? Number(event.target.value) : event.target.value }));
+    const numericFields = ["estimated_hours", "estimated_minutes_part"];
+    setForm((current) => ({ ...current, [field]: numericFields.includes(field) ? Number(event.target.value) : event.target.value }));
   };
 
   return (
@@ -165,6 +195,7 @@ export default function TasksPage() {
                   <TableCell>Tarea</TableCell>
                   <TableCell>Descripcion</TableCell>
                   <TableCell>Tiempo previsto</TableCell>
+                  <TableCell>Mano de obra</TableCell>
                   <TableCell>Estado</TableCell>
                   <TableCell align="right">Acciones</TableCell>
                 </TableRow>
@@ -177,6 +208,7 @@ export default function TasksPage() {
                     </TableCell>
                     <TableCell>{task.description || "-"}</TableCell>
                     <TableCell>{formatMinutes(task.estimated_minutes)}</TableCell>
+                    <TableCell>{moneyFormatter.format(Number(task.labor_cost || 0))}</TableCell>
                     <TableCell>
                       <StatusChip
                         label={task.status === "active" ? "Activo" : "Inactivo"}
@@ -199,7 +231,7 @@ export default function TasksPage() {
                 ))}
                 {!tasksQuery.isLoading && rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5}>
+                    <TableCell colSpan={6}>
                       <Typography color="text.secondary" textAlign="center" py={4}>
                         No hay tareas para mostrar.
                       </Typography>
@@ -240,15 +272,37 @@ export default function TasksPage() {
                 <Grid item xs={12} md={8}>
                   <TextField label="Nombre de la tarea" value={form.name} onChange={updateForm("name")} required fullWidth />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} md={2}>
                   <TextField
-                    label="Tiempo previsto (minutos)"
+                    label="Horas"
                     type="number"
-                    value={form.estimated_minutes}
-                    onChange={updateForm("estimated_minutes")}
+                    value={form.estimated_hours}
+                    onChange={updateForm("estimated_hours")}
                     required
                     fullWidth
-                    inputProps={{ min: 1 }}
+                    inputProps={{ min: 0 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    label="Minutos"
+                    type="number"
+                    value={form.estimated_minutes_part}
+                    onChange={updateForm("estimated_minutes_part")}
+                    required
+                    fullWidth
+                    inputProps={{ min: 0, max: 59 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Costo mano de obra"
+                    type="number"
+                    value={form.labor_cost}
+                    onChange={updateForm("labor_cost")}
+                    required
+                    fullWidth
+                    inputProps={{ min: 0, step: "0.01" }}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import Estimate, EstimateStatus, Invoice, MercadoPagoPayment, Payment, PaymentStatus
@@ -8,8 +10,37 @@ class EstimateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Estimate
-        fields = ("id", "work_order", "work_order_number", "labor_amount", "materials_amount", "parts_amount", "total_amount", "status", "approved_at", "created_at", "updated_at")
-        read_only_fields = ("id", "work_order_number", "total_amount", "approved_at", "created_at", "updated_at")
+        fields = (
+            "id",
+            "work_order",
+            "work_order_number",
+            "labor_amount",
+            "materials_amount",
+            "parts_amount",
+            "extra_description",
+            "extra_amount",
+            "total_amount",
+            "status",
+            "approved_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "work_order_number",
+            "labor_amount",
+            "materials_amount",
+            "parts_amount",
+            "total_amount",
+            "approved_at",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate_extra_amount(self, value):
+        if value < 0:
+            raise serializers.ValidationError("El item adicional no puede ser negativo.")
+        return value
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
@@ -21,8 +52,54 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Invoice
-        fields = ("id", "invoice_number", "work_order", "work_order_number", "client_name", "issued_at", "total", "payment_status", "paid_amount", "balance_due", "mercadopago_status", "notes", "created_at", "updated_at")
-        read_only_fields = ("id", "invoice_number", "work_order_number", "client_name", "paid_amount", "balance_due", "mercadopago_status", "created_at", "updated_at")
+        fields = (
+            "id",
+            "invoice_number",
+            "work_order",
+            "work_order_number",
+            "client_name",
+            "estimate",
+            "issued_at",
+            "labor_amount",
+            "materials_amount",
+            "parts_amount",
+            "extra_description",
+            "extra_amount",
+            "subtotal",
+            "discount_percent",
+            "discount_amount",
+            "taxable_amount",
+            "tax_percent",
+            "tax_amount",
+            "total",
+            "payment_status",
+            "paid_amount",
+            "balance_due",
+            "mercadopago_status",
+            "notes",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "invoice_number",
+            "work_order_number",
+            "client_name",
+            "labor_amount",
+            "materials_amount",
+            "parts_amount",
+            "subtotal",
+            "discount_amount",
+            "taxable_amount",
+            "tax_amount",
+            "total",
+            "paid_amount",
+            "balance_due",
+            "mercadopago_status",
+            "created_at",
+            "updated_at",
+        )
+        extra_kwargs = {"work_order": {"required": False}}
 
     def get_balance_due(self, obj):
         balance = obj.total - obj.paid_amount
@@ -33,6 +110,28 @@ class InvoiceSerializer(serializers.ModelSerializer):
         if not payment:
             return ""
         return payment.status
+
+    def validate(self, attrs):
+        estimate = attrs.get("estimate", getattr(self.instance, "estimate", None))
+        work_order = attrs.get("work_order", getattr(self.instance, "work_order", None))
+        if estimate and not work_order:
+            attrs["work_order"] = estimate.work_order
+            work_order = estimate.work_order
+        if estimate and work_order and estimate.work_order_id != work_order.id:
+            raise serializers.ValidationError({"estimate": "El presupuesto no pertenece a la orden seleccionada."})
+
+        tax_percent = attrs.get("tax_percent", getattr(self.instance, "tax_percent", Decimal("21.00")))
+        if Decimal(str(tax_percent)) not in {Decimal("10.50"), Decimal("21.00")}:
+            raise serializers.ValidationError({"tax_percent": "El IVA debe ser 21% o 10,5%."})
+
+        discount_percent = attrs.get("discount_percent", getattr(self.instance, "discount_percent", Decimal("0.00")))
+        if discount_percent < 0 or discount_percent > 100:
+            raise serializers.ValidationError({"discount_percent": "El descuento debe estar entre 0 y 100%."})
+
+        extra_amount = attrs.get("extra_amount", getattr(self.instance, "extra_amount", Decimal("0.00")))
+        if extra_amount < 0:
+            raise serializers.ValidationError({"extra_amount": "El item adicional no puede ser negativo."})
+        return attrs
 
 
 class PaymentSerializer(serializers.ModelSerializer):

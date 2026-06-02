@@ -5,7 +5,7 @@ from .models import TaskTemplate, WorkOrder, WorkOrderStatusHistory, WorkOrderTa
 
 @admin.register(TaskTemplate)
 class TaskTemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "estimated_minutes", "status")
+    list_display = ("name", "estimated_minutes", "labor_cost", "status")
     list_filter = ("status", "created_at")
     search_fields = ("name", "description")
     readonly_fields = ("created_at", "updated_at", "deleted_at")
@@ -21,7 +21,7 @@ class WorkOrderAdmin(admin.ModelAdmin):
 
 @admin.register(WorkOrderTask)
 class WorkOrderTaskAdmin(admin.ModelAdmin):
-    list_display = ("title", "work_order", "operator", "status", "priority", "sector", "estimated_minutes")
+    list_display = ("title", "work_order", "operator", "status", "priority", "sector", "estimated_minutes", "labor_cost")
     list_filter = ("status", "priority", "sector", "operator", "created_at")
     search_fields = ("title", "description", "operator__first_name", "operator__last_name", "work_order__order_number")
     readonly_fields = ("created_at", "updated_at", "deleted_at")

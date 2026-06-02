@@ -43,6 +43,16 @@ def _money(value):
     return f"$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _minutes(value):
+    total = int(value or 0)
+    hours, minutes = divmod(total, 60)
+    if hours and minutes:
+        return f"{hours} h {minutes} min"
+    if hours:
+        return f"{hours} h"
+    return f"{minutes} min"
+
+
 def _date(value):
     if not value:
         return "-"
@@ -163,17 +173,18 @@ def generate_work_order_pdf(work_order):
 
         tasks = list(work_order.tasks.all())
         elements.append(_p("Tareas", styles["Section"]))
-        task_rows = [[_p("Tarea", styles["CellBold"]), _p("Operario", styles["CellBold"]), _p("Sector", styles["CellBold"]), _p("Estado", styles["CellBold"])]]
+        task_rows = [[_p("Tarea", styles["CellBold"]), _p("Operario", styles["CellBold"]), _p("Tiempo", styles["CellBold"]), _p("Costo", styles["CellBold"]), _p("Estado", styles["CellBold"])]]
         for task in tasks:
             task_rows.append([
                 _p(task.title, styles["Cell"]),
                 _p(task.operator.full_name if task.operator else "-", styles["Cell"]),
-                _p(task.sector or "-", styles["Cell"]),
+                _p(_minutes(task.estimated_minutes), styles["Cell"]),
+                _p(_money(task.labor_cost), styles["Cell"]),
                 _p(task.get_status_display(), styles["Cell"]),
             ])
         if len(task_rows) == 1:
-            task_rows.append([_p("Sin tareas registradas", styles["Cell"]), "", "", ""])
-        elements.append(_table(task_rows, widths=[60 * mm, 45 * mm, 33 * mm, 32 * mm]))
+            task_rows.append([_p("Sin tareas registradas", styles["Cell"]), "", "", "", ""])
+        elements.append(_table(task_rows, widths=[52 * mm, 42 * mm, 26 * mm, 35 * mm, 25 * mm]))
 
         elements.append(_p("Repuestos y materiales", styles["Section"]))
         item_rows = [[_p("Tipo", styles["CellBold"]), _p("Codigo", styles["CellBold"]), _p("Detalle", styles["CellBold"]), _p("Cantidad", styles["CellBold"]), _p("Total", styles["CellBold"])]]
@@ -184,6 +195,14 @@ def generate_work_order_pdf(work_order):
         if len(item_rows) == 1:
             item_rows.append([_p("Sin consumos registrados", styles["Cell"]), "", "", "", ""])
         elements.append(_table(item_rows, widths=[25 * mm, 32 * mm, 63 * mm, 25 * mm, 25 * mm]))
+        elements.append(_p("Totales de la orden", styles["Section"]))
+        elements.append(_table([
+            [_p("Concepto", styles["CellBold"]), _p("Importe", styles["CellBold"])],
+            [_p("Mano de obra", styles["Cell"]), _p(_money(work_order.labor_amount), styles["Cell"])],
+            [_p("Materiales", styles["Cell"]), _p(_money(work_order.materials_amount), styles["Cell"])],
+            [_p("Repuestos", styles["Cell"]), _p(_money(work_order.parts_amount), styles["Cell"])],
+            [_p("Subtotal", styles["CellBold"]), _p(_money(work_order.subtotal_amount), styles["CellBold"])],
+        ], widths=[120 * mm, 50 * mm]))
 
     return _build_pdf(profile.order_header_title, body)
 
@@ -206,6 +225,7 @@ def generate_estimate_pdf(estimate):
             [_p("Mano de obra", styles["Cell"]), _p(_money(estimate.labor_amount), styles["Cell"])],
             [_p("Materiales", styles["Cell"]), _p(_money(estimate.materials_amount), styles["Cell"])],
             [_p("Repuestos", styles["Cell"]), _p(_money(estimate.parts_amount), styles["Cell"])],
+            [_p(estimate.extra_description or "Item adicional", styles["Cell"]), _p(_money(estimate.extra_amount), styles["Cell"])],
             [_p("Total final", styles["CellBold"]), _p(_money(estimate.total_amount), styles["CellBold"])],
         ], widths=[120 * mm, 50 * mm]))
         elements.append(_p("Descripcion de la orden", styles["Section"]))
@@ -229,7 +249,14 @@ def generate_invoice_pdf(invoice):
         elements.append(_p("Totales", styles["Section"]))
         elements.append(_table([
             [_p("Concepto", styles["CellBold"]), _p("Importe", styles["CellBold"])],
-            [_p("Total facturado", styles["Cell"]), _p(_money(invoice.total), styles["Cell"])],
+            [_p("Mano de obra", styles["Cell"]), _p(_money(invoice.labor_amount), styles["Cell"])],
+            [_p("Materiales", styles["Cell"]), _p(_money(invoice.materials_amount), styles["Cell"])],
+            [_p("Repuestos", styles["Cell"]), _p(_money(invoice.parts_amount), styles["Cell"])],
+            [_p(invoice.extra_description or "Item adicional", styles["Cell"]), _p(_money(invoice.extra_amount), styles["Cell"])],
+            [_p("Subtotal", styles["Cell"]), _p(_money(invoice.subtotal), styles["Cell"])],
+            [_p(f"Descuento {invoice.discount_percent}%", styles["Cell"]), _p(_money(invoice.discount_amount), styles["Cell"])],
+            [_p(f"IVA {invoice.tax_percent}%", styles["Cell"]), _p(_money(invoice.tax_amount), styles["Cell"])],
+            [_p("Total facturado", styles["CellBold"]), _p(_money(invoice.total), styles["CellBold"])],
             [_p("Total pagado", styles["Cell"]), _p(_money(invoice.paid_amount), styles["Cell"])],
             [_p("Saldo", styles["CellBold"]), _p(_money(Decimal(invoice.total) - Decimal(invoice.paid_amount)), styles["CellBold"])],
         ], widths=[120 * mm, 50 * mm]))

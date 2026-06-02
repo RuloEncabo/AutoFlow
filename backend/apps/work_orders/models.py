@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
@@ -50,6 +51,7 @@ class TaskTemplate(AuditStampedModel):
     name = models.CharField(max_length=180)
     description = models.TextField(blank=True)
     estimated_minutes = models.PositiveIntegerField(default=0)
+    labor_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(
         max_length=20,
         choices=TaskTemplateStatus.choices,
@@ -143,6 +145,31 @@ class WorkOrder(AuditStampedModel):
             return 0
         return round((self.tasks_completed / total) * 100)
 
+    @property
+    def labor_amount(self) -> Decimal:
+        return sum(
+            (task.labor_cost for task in self.tasks.exclude(status=TaskStatus.CANCELLED)),
+            Decimal("0.00"),
+        )
+
+    @property
+    def parts_amount(self) -> Decimal:
+        return sum(
+            (item.total_cost for item in self.parts.exclude(status="returned")),
+            Decimal("0.00"),
+        )
+
+    @property
+    def materials_amount(self) -> Decimal:
+        return sum(
+            (item.total_cost for item in self.materials.exclude(status="returned")),
+            Decimal("0.00"),
+        )
+
+    @property
+    def subtotal_amount(self) -> Decimal:
+        return self.labor_amount + self.parts_amount + self.materials_amount
+
 
 class WorkOrderTask(AuditStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -175,6 +202,7 @@ class WorkOrderTask(AuditStampedModel):
     sector = models.CharField(max_length=80, blank=True, db_index=True)
     execution_order = models.PositiveIntegerField(default=1)
     estimated_minutes = models.PositiveIntegerField(default=0)
+    labor_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     estimated_date = models.DateField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.db import models
@@ -45,12 +45,18 @@ class MercadoPagoPaymentStatus(models.TextChoices):
     UNKNOWN = "unknown", "Desconocido"
 
 
+def _money(value) -> Decimal:
+    return Decimal(str(value or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 class Estimate(AuditStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name="estimates")
     labor_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     materials_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     parts_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    extra_description = models.CharField(max_length=255, blank=True)
+    extra_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(max_length=20, choices=EstimateStatus.choices, default=EstimateStatus.PENDING, db_index=True)
     approved_at = models.DateTimeField(null=True, blank=True)
@@ -60,7 +66,11 @@ class Estimate(AuditStampedModel):
         indexes = [models.Index(fields=["work_order", "status"])]
 
     def save(self, *args, **kwargs):
-        self.total_amount = (self.labor_amount or 0) + (self.materials_amount or 0) + (self.parts_amount or 0)
+        self.labor_amount = _money(self.work_order.labor_amount)
+        self.materials_amount = _money(self.work_order.materials_amount)
+        self.parts_amount = _money(self.work_order.parts_amount)
+        self.extra_amount = _money(self.extra_amount)
+        self.total_amount = _money(self.labor_amount + self.materials_amount + self.parts_amount + self.extra_amount)
         if self.status == EstimateStatus.APPROVED and not self.approved_at:
             self.approved_at = timezone.now()
         super().save(*args, **kwargs)
@@ -70,8 +80,20 @@ class Invoice(AuditStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_number = models.CharField(max_length=40, unique=True, blank=True)
     work_order = models.ForeignKey(WorkOrder, on_delete=models.PROTECT, related_name="invoices")
+    estimate = models.ForeignKey(Estimate, null=True, blank=True, on_delete=models.PROTECT, related_name="invoices")
     issued_at = models.DateTimeField(default=timezone.now, db_index=True)
-    total = models.DecimalField(max_digits=12, decimal_places=2)
+    labor_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    materials_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    parts_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    extra_description = models.CharField(max_length=255, blank=True)
+    extra_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    taxable_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("21.00"))
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     payment_status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING, db_index=True)
     notes = models.TextField(blank=True)
 
@@ -88,6 +110,46 @@ class Invoice(AuditStampedModel):
     @property
     def paid_amount(self):
         return sum((payment.amount for payment in self.payments.all()), Decimal("0.00"))
+
+    def _source_estimate(self):
+        if self.estimate_id:
+            return self.estimate
+        if not self.work_order_id:
+            return None
+        return (
+            self.work_order.estimates.filter(status=EstimateStatus.APPROVED)
+            .order_by("-approved_at", "-created_at")
+            .first()
+        )
+
+    def _load_base_amounts(self):
+        estimate = self._source_estimate()
+        if estimate:
+            self.estimate = self.estimate or estimate
+            self.labor_amount = _money(estimate.labor_amount)
+            self.materials_amount = _money(estimate.materials_amount)
+            self.parts_amount = _money(estimate.parts_amount)
+            if not self.extra_description:
+                self.extra_description = estimate.extra_description
+            if not self.extra_amount:
+                self.extra_amount = estimate.extra_amount
+            return
+
+        self.labor_amount = _money(self.work_order.labor_amount)
+        self.materials_amount = _money(self.work_order.materials_amount)
+        self.parts_amount = _money(self.work_order.parts_amount)
+
+    def save(self, *args, **kwargs):
+        self._load_base_amounts()
+        self.extra_amount = _money(self.extra_amount)
+        self.discount_percent = _money(self.discount_percent)
+        self.tax_percent = _money(self.tax_percent)
+        self.subtotal = _money(self.labor_amount + self.materials_amount + self.parts_amount + self.extra_amount)
+        self.discount_amount = _money(self.subtotal * self.discount_percent / Decimal("100"))
+        self.taxable_amount = _money(max(self.subtotal - self.discount_amount, Decimal("0.00")))
+        self.tax_amount = _money(self.taxable_amount * self.tax_percent / Decimal("100"))
+        self.total = _money(self.taxable_amount + self.tax_amount)
+        super().save(*args, **kwargs)
 
 
 class Payment(models.Model):

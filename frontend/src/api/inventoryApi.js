@@ -66,3 +66,23 @@ export async function lookupMaterialByScan(code) {
   const response = await apiClient.post("/inventory/materials/scan-lookup/", { code });
   return response.data;
 }
+
+export async function listWorkOrderParts(params = {}) {
+  const response = await apiClient.get("/inventory/work-order-parts/", { params });
+  return response.data;
+}
+
+export async function createWorkOrderPart(payload) {
+  const response = await apiClient.post("/inventory/work-order-parts/", payload);
+  return response.data;
+}
+
+export async function listWorkOrderMaterials(params = {}) {
+  const response = await apiClient.get("/inventory/work-order-materials/", { params });
+  return response.data;
+}
+
+export async function createWorkOrderMaterial(payload) {
+  const response = await apiClient.post("/inventory/work-order-materials/", payload);
+  return response.data;
+}

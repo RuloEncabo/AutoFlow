@@ -74,6 +74,7 @@ class InvoiceViewSet(AuditModelViewSet):
 
     def get_queryset(self):
         return Invoice.objects.select_related(
+            "estimate",
             "work_order",
             "work_order__client",
             "work_order__vehicle",
