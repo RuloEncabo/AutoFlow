@@ -8,6 +8,8 @@ from django.utils.translation import gettext_lazy as _
 
 class UserRole(models.TextChoices):
     ADMIN = "admin", _("Administrador")
+    OPERATIVE = "operativo", _("Operativo")
+    ADMINISTRATION = "administracion", _("Administracion")
     APP_USER = "app_user", _("Usuario App")
 
 
@@ -26,7 +28,7 @@ class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
-        extra_fields.setdefault("role", UserRole.APP_USER)
+        extra_fields.setdefault("role", UserRole.OPERATIVE)
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password=None, **extra_fields):
@@ -66,4 +68,3 @@ class User(AbstractUser):
     @property
     def full_name(self) -> str:
         return self.get_full_name() or self.email
-

@@ -35,6 +35,16 @@ export async function createWorkOrderTask(id, payload) {
   return response.data;
 }
 
+export async function startWorkOrderTask(id) {
+  const response = await apiClient.post(`/work-orders/tasks/${id}/start/`);
+  return response.data;
+}
+
+export async function completeWorkOrderTask(id) {
+  const response = await apiClient.post(`/work-orders/tasks/${id}/complete/`);
+  return response.data;
+}
+
 export async function downloadWorkOrderPdf(id, fallbackName = "orden.pdf") {
   const response = await apiClient.get(`/work-orders/${id}/pdf/`, { responseType: "blob" });
   downloadBlobResponse(response, fallbackName);

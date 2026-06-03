@@ -27,7 +27,7 @@ import { listOperators } from "../../api/operatorsApi.js";
 import { listTasks as listTaskCatalog } from "../../api/tasksApi.js";
 import { listVehicles } from "../../api/vehiclesApi.js";
 import {
-  changeWorkOrderStatus, createWorkOrder, createWorkOrderTask, deleteWorkOrder,
+  changeWorkOrderStatus, completeWorkOrderTask, createWorkOrder, createWorkOrderTask, deleteWorkOrder,
   downloadWorkOrderPdf, listWorkOrders, listWorkOrderTasks, updateWorkOrder,
 } from "../../api/workOrdersApi.js";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
@@ -120,6 +120,13 @@ export default function WorkOrdersPage() {
   const deleteMutation = useMutation({ mutationFn: (id) => deleteWorkOrder(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["work-orders"] }); setDeleteTarget(null); } });
   const statusMutation = useMutation({ mutationFn: ({ id, status }) => changeWorkOrderStatus(id, status), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["work-orders"] }) });
   const taskMutation = useMutation({ mutationFn: () => createWorkOrderTask(taskOrder.id, buildTaskPayload(taskForm)), onSuccess: () => { setTaskForm(emptyTask); queryClient.invalidateQueries({ queryKey: ["work-order-tasks"] }); queryClient.invalidateQueries({ queryKey: ["work-orders"] }); } });
+  const completeTaskMutation = useMutation({
+    mutationFn: (id) => completeWorkOrderTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["work-order-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+    },
+  });
   const partMutation = useMutation({
     mutationFn: () => createWorkOrderPart({ work_order: taskOrder.id, part: partForm.part, quantity: partForm.quantity, unit_cost: partForm.unit_cost || "0.00", status: "used" }),
     onSuccess: () => { setPartForm(emptyPartUsage); queryClient.invalidateQueries({ queryKey: ["work-order-parts"] }); queryClient.invalidateQueries({ queryKey: ["work-orders"] }); },
@@ -139,6 +146,7 @@ export default function WorkOrdersPage() {
     setPartForm(emptyPartUsage);
     setMaterialForm(emptyMaterialUsage);
     taskMutation.reset();
+    completeTaskMutation.reset();
     partMutation.reset();
     materialMutation.reset();
   };
@@ -260,8 +268,8 @@ export default function WorkOrdersPage() {
                 <Grid item xs={12} md={3}><Button variant="contained" fullWidth sx={{ height: 40 }} onClick={() => taskMutation.mutate()} disabled={!taskForm.task_template || !taskForm.operator || taskMutation.isPending}>Agregar tarea</Button></Grid>
               </Grid>
               <Table size="small" sx={{ mt: 2 }}>
-                <TableHead><TableRow><TableCell>Tarea</TableCell><TableCell>Operario</TableCell><TableCell>Tiempo</TableCell><TableCell>Costo</TableCell><TableCell>Sector</TableCell><TableCell>Estado</TableCell></TableRow></TableHead>
-                <TableBody>{(tasksQuery.data || []).map((task) => <TableRow key={task.id}><TableCell><Typography fontWeight={700}>{task.title}</Typography><Typography variant="caption" color="text.secondary">{task.task_template_name || "Manual"}</Typography></TableCell><TableCell>{task.operator_name || "Sin asignar"}</TableCell><TableCell>{formatMinutes(task.estimated_minutes)}</TableCell><TableCell>{moneyFormatter.format(Number(task.labor_cost || 0))}</TableCell><TableCell>{task.sector || "-"}</TableCell><TableCell>{task.status}</TableCell></TableRow>)}</TableBody>
+                <TableHead><TableRow><TableCell>Tarea</TableCell><TableCell>Operario</TableCell><TableCell>Tiempo</TableCell><TableCell>Costo</TableCell><TableCell>Sector</TableCell><TableCell>Estado</TableCell><TableCell align="right">Acciones</TableCell></TableRow></TableHead>
+                <TableBody>{(tasksQuery.data || []).map((task) => <TableRow key={task.id}><TableCell><Typography fontWeight={700}>{task.title}</Typography><Typography variant="caption" color="text.secondary">{task.task_template_name || "Manual"}</Typography></TableCell><TableCell>{task.operator_name || "Sin asignar"}</TableCell><TableCell>{formatMinutes(task.estimated_minutes)}</TableCell><TableCell>{moneyFormatter.format(Number(task.labor_cost || 0))}</TableCell><TableCell>{task.sector || "-"}</TableCell><TableCell>{task.status}</TableCell><TableCell align="right"><Tooltip title="Cerrar tarea terminada"><span><IconButton color="success" disabled={task.status === "completed" || completeTaskMutation.isPending} onClick={() => completeTaskMutation.mutate(task.id)}><CheckCircleIcon /></IconButton></span></Tooltip></TableCell></TableRow>)}</TableBody>
               </Table>
             </Box>
 

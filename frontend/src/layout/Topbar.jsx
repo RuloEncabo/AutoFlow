@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 
 import { logout } from "../auth/authSlice.js";
+import { roleLabels } from "../auth/roles.js";
 
 export default function Topbar({ drawerWidth, onMenuClick }) {
   const dispatch = useDispatch();
@@ -57,7 +58,7 @@ export default function Topbar({ drawerWidth, onMenuClick }) {
               {user?.full_name || user?.email || "Usuario"}
             </Typography>
             <Typography display="block" variant="caption" color="text.secondary">
-              {user?.role === "admin" ? "Administrador" : "Usuario App"}
+              {roleLabels[user?.role] || "Usuario"}
             </Typography>
           </Box>
           <Tooltip title="Cerrar sesion">

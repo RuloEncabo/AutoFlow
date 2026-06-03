@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from apps.core.permissions import IsAuthenticatedAndAdminForDelete
+from apps.core.permissions import IsInventoryRole, IsWorkOrderInventoryUsageRole
 from apps.core.viewsets import AuditModelViewSet
 
 from .filters import InventoryFamilyFilter, MaterialFilter, PartFilter, WorkOrderMaterialFilter, WorkOrderPartFilter
@@ -77,7 +77,7 @@ class StockAdjustmentMixin:
 class InventoryFamilyViewSet(AuditModelViewSet):
     audit_module = "inventory_families"
     serializer_class = InventoryFamilySerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsInventoryRole]
     filterset_class = InventoryFamilyFilter
     search_fields = ("name", "description")
     ordering_fields = ("name", "status", "created_at")
@@ -91,7 +91,7 @@ class PartViewSet(StockAdjustmentMixin, AuditModelViewSet):
     audit_module = "inventory_parts"
     item_type = "part"
     serializer_class = PartSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsInventoryRole]
     filterset_class = PartFilter
     search_fields = ("code", "supplier_code", "barcode", "qr_code", "name", "description", "family__name")
     ordering_fields = ("code", "supplier_code", "name", "stock", "min_stock", "cost", "created_at")
@@ -105,7 +105,7 @@ class MaterialViewSet(StockAdjustmentMixin, AuditModelViewSet):
     audit_module = "inventory_materials"
     item_type = "material"
     serializer_class = MaterialSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsInventoryRole]
     filterset_class = MaterialFilter
     search_fields = ("code", "supplier_code", "barcode", "qr_code", "name", "type", "description", "family__name")
     ordering_fields = ("code", "supplier_code", "name", "type", "stock", "min_stock", "cost", "created_at")
@@ -118,7 +118,7 @@ class MaterialViewSet(StockAdjustmentMixin, AuditModelViewSet):
 class WorkOrderPartViewSet(AuditModelViewSet):
     audit_module = "work_order_parts"
     serializer_class = WorkOrderPartSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsWorkOrderInventoryUsageRole]
     filterset_class = WorkOrderPartFilter
 
     def get_queryset(self):
@@ -128,7 +128,7 @@ class WorkOrderPartViewSet(AuditModelViewSet):
 class WorkOrderMaterialViewSet(AuditModelViewSet):
     audit_module = "work_order_materials"
     serializer_class = WorkOrderMaterialSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsWorkOrderInventoryUsageRole]
     filterset_class = WorkOrderMaterialFilter
 
     def get_queryset(self):

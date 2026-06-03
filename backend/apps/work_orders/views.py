@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 from apps.audit.models import AuditAction
 from apps.audit.services import create_audit_log
-from apps.core.permissions import IsAuthenticatedAndAdminForDelete
+from apps.core.permissions import IsWorkOrderRole
 from apps.core.pdf import generate_work_order_pdf, pdf_response
 from apps.core.viewsets import AuditModelViewSet, snapshot_instance
 
@@ -24,7 +24,7 @@ from .services import ensure_order_number
 class TaskTemplateViewSet(AuditModelViewSet):
     audit_module = "task_templates"
     serializer_class = TaskTemplateSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsWorkOrderRole]
     filterset_class = TaskTemplateFilter
     search_fields = ("name", "description")
     ordering_fields = ("name", "estimated_minutes", "status", "created_at")
@@ -37,7 +37,7 @@ class TaskTemplateViewSet(AuditModelViewSet):
 class WorkOrderViewSet(AuditModelViewSet):
     audit_module = "work_orders"
     serializer_class = WorkOrderSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsWorkOrderRole]
     filterset_class = WorkOrderFilter
     search_fields = ("order_number", "client__first_name", "client__last_name", "vehicle__plate", "description", "notes")
     ordering_fields = ("order_number", "entry_date", "estimated_delivery_date", "priority", "status", "created_at")
@@ -131,7 +131,7 @@ class WorkOrderViewSet(AuditModelViewSet):
 class WorkOrderTaskViewSet(AuditModelViewSet):
     audit_module = "work_order_tasks"
     serializer_class = WorkOrderTaskSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsWorkOrderRole]
     filterset_class = WorkOrderTaskFilter
     search_fields = ("title", "description", "sector", "work_order__order_number")
     ordering_fields = ("execution_order", "estimated_date", "status", "priority", "created_at")

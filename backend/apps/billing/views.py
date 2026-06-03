@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from apps.audit.models import AuditAction
 from apps.audit.services import create_audit_log
-from apps.core.permissions import IsAuthenticatedAndAdminForDelete
+from apps.core.permissions import IsAdminOrAdministrationForDelete
 from apps.core.pdf import generate_estimate_pdf, generate_invoice_pdf, pdf_response
 from apps.core.viewsets import AuditModelViewSet, snapshot_instance
 
@@ -28,7 +28,7 @@ from .services import generate_invoice_number
 class EstimateViewSet(AuditModelViewSet):
     audit_module = "billing_estimates"
     serializer_class = EstimateSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsAdminOrAdministrationForDelete]
     filterset_class = EstimateFilter
     search_fields = ("work_order__order_number", "work_order__client__first_name", "work_order__client__last_name")
     ordering_fields = ("created_at", "total_amount", "status")
@@ -66,7 +66,7 @@ class EstimateViewSet(AuditModelViewSet):
 class InvoiceViewSet(AuditModelViewSet):
     audit_module = "billing_invoices"
     serializer_class = InvoiceSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsAdminOrAdministrationForDelete]
     filterset_class = InvoiceFilter
     search_fields = ("invoice_number", "work_order__order_number", "work_order__client__first_name", "work_order__client__last_name")
     ordering_fields = ("issued_at", "total", "payment_status")
@@ -113,7 +113,7 @@ class InvoiceViewSet(AuditModelViewSet):
 class PaymentViewSet(AuditModelViewSet):
     audit_module = "billing_payments"
     serializer_class = PaymentSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsAdminOrAdministrationForDelete]
     filterset_class = PaymentFilter
     search_fields = ("invoice__invoice_number", "reference", "notes")
     ordering_fields = ("paid_at", "amount", "method")
@@ -140,7 +140,7 @@ class PaymentViewSet(AuditModelViewSet):
 
 class MercadoPagoPaymentViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MercadoPagoPaymentSerializer
-    permission_classes = [IsAuthenticatedAndAdminForDelete]
+    permission_classes = [IsAdminOrAdministrationForDelete]
     search_fields = ("invoice__invoice_number", "payment_id", "preference_id", "external_reference")
     ordering_fields = ("created_at", "updated_at", "paid_at", "status", "amount")
     ordering = ("-created_at",)

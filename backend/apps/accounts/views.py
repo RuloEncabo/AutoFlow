@@ -1,7 +1,10 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 from rest_framework_simplejwt.exceptions import TokenError
@@ -11,7 +14,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.audit.models import SessionEvent
 from apps.audit.services import create_session_audit
-from .serializers import LogoutSerializer, UserProfileSerializer
+from apps.core.permissions import IsAdminRole
+from .serializers import LogoutSerializer, UserProfileSerializer, UserSerializer
+
+
+User = get_user_model()
 
 
 class LoginView(TokenObtainPairView):
@@ -92,3 +99,21 @@ class LogoutView(APIView):
             metadata={"email": request.user.email},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserViewSet(ModelViewSet):
+    serializer_class = UserSerializer
+    permission_classes = [IsAdminRole]
+    search_fields = ("email", "first_name", "last_name", "phone")
+    ordering_fields = ("email", "first_name", "last_name", "role", "is_active", "date_joined")
+    ordering = ("email",)
+
+    def get_queryset(self):
+        return User.objects.filter(deleted_at__isnull=True)
+
+    def perform_destroy(self, instance):
+        if instance.pk == self.request.user.pk:
+            raise ValidationError({"user": "No puede darse de baja el usuario autenticado."})
+        instance.is_active = False
+        instance.deleted_at = timezone.now()
+        instance.save(update_fields=["is_active", "deleted_at"])

@@ -10,11 +10,16 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
+import { useSelector } from "react-redux";
 
 import LogoMark from "../components/LogoMark.jsx";
 import { navigation } from "./navigation.js";
+import { hasAllowedRole } from "../auth/roles.js";
 
 export default function Sidebar({ drawerWidth, mobileOpen, onClose }) {
+  const user = useSelector((state) => state.auth.user);
+  const visibleNavigation = navigation.filter((item) => hasAllowedRole(user, item.roles));
+
   const content = (
     <Box height="100%" display="flex" flexDirection="column">
       <Toolbar sx={{ px: 3 }}>
@@ -22,7 +27,7 @@ export default function Sidebar({ drawerWidth, mobileOpen, onClose }) {
       </Toolbar>
       <Divider sx={{ borderColor: "customColors.navBorder" }} />
       <List sx={{ px: 2, py: 2 }}>
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const Icon = item.icon;
           return (
             <ListItemButton
