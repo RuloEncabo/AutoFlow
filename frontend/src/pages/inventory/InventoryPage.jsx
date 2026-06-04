@@ -2,6 +2,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import PrintIcon from "@mui/icons-material/Print";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
@@ -45,6 +46,8 @@ import {
   deleteFamily,
   deleteMaterial,
   deletePart,
+  exportMaterials,
+  exportParts,
   listFamilies,
   listMaterials,
   listParts,
@@ -233,6 +236,7 @@ export default function InventoryPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [scannerConfig, setScannerConfig] = useState(null);
   const [codeTarget, setCodeTarget] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const familiesQuery = useQuery({
     queryKey: ["inventory-families"],
@@ -379,6 +383,15 @@ export default function InventoryPage() {
     window.print();
   };
 
+  const handleExport = async (withItems = false) => {
+    try {
+      const exportFn = tab === "parts" ? exportParts : exportMaterials;
+      await exportFn(withItems);
+    } catch (error) {
+      setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo exportar inventario.") });
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap">
@@ -390,6 +403,16 @@ export default function InventoryPage() {
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {canCreateByScan && (
+            <>
+              <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(false)}>
+                Excel
+              </Button>
+              <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(true)}>
+                Excel con items
+              </Button>
+            </>
+          )}
+          {canCreateByScan && (
             <Button variant="outlined" startIcon={<QrCodeScannerIcon />} onClick={openCreateByScan}>
               Alta por lectura
             </Button>
@@ -399,6 +422,8 @@ export default function InventoryPage() {
           </Button>
         </Stack>
       </Box>
+
+      {toast && <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert>}
 
       <Card>
         <CardContent>

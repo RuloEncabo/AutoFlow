@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 from apps.audit.models import AuditAction
 from apps.audit.services import create_audit_log
+from apps.core.excel import build_workbook, excel_response, query_bool
 from apps.core.permissions import IsWorkOrderRole
 from apps.core.pdf import generate_work_order_pdf, pdf_response
 from apps.core.viewsets import AuditModelViewSet, snapshot_instance
@@ -21,6 +22,23 @@ from .serializers import (
 from .services import ensure_order_number
 
 
+def _display(instance, field):
+    method = getattr(instance, f"get_{field}_display", None)
+    if callable(method):
+        return method()
+    return getattr(instance, field, "")
+
+
+def _minutes(value):
+    total = int(value or 0)
+    hours, minutes = divmod(total, 60)
+    if hours and minutes:
+        return f"{hours} h {minutes} min"
+    if hours:
+        return f"{hours} h"
+    return f"{minutes} min"
+
+
 class TaskTemplateViewSet(AuditModelViewSet):
     audit_module = "task_templates"
     serializer_class = TaskTemplateSerializer
@@ -32,6 +50,57 @@ class TaskTemplateViewSet(AuditModelViewSet):
 
     def get_queryset(self):
         return TaskTemplate.objects.all()
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        if query_bool(request):
+            headers = [
+                "Tarea catalogo",
+                "Orden",
+                "Cliente",
+                "Vehiculo",
+                "Patente",
+                "Operario",
+                "Estado asignacion",
+                "Tiempo",
+                "Costo mano de obra",
+                "Sector",
+                "Fecha cierre",
+            ]
+            usages = WorkOrderTask.objects.select_related(
+                "task_template",
+                "work_order",
+                "work_order__client",
+                "work_order__vehicle",
+                "operator",
+            ).filter(task_template__in=queryset)
+            rows = [
+                [
+                    task.task_template.name if task.task_template else task.title,
+                    task.work_order.order_number,
+                    task.work_order.client.full_name,
+                    f"{task.work_order.vehicle.brand} {task.work_order.vehicle.model}",
+                    task.work_order.vehicle.plate,
+                    task.operator.full_name if task.operator else "",
+                    _display(task, "status"),
+                    _minutes(task.estimated_minutes),
+                    task.labor_cost,
+                    task.sector,
+                    task.finished_at,
+                ]
+                for task in usages
+            ]
+            workbook = build_workbook("Tareas con items", headers, rows)
+            return excel_response(workbook, "tareas_con_items")
+
+        headers = ["Nombre", "Descripcion", "Tiempo previsto", "Costo mano de obra", "Estado", "Creado", "Actualizado"]
+        rows = [
+            [task.name, task.description, _minutes(task.estimated_minutes), task.labor_cost, _display(task, "status"), task.created_at, task.updated_at]
+            for task in queryset
+        ]
+        workbook = build_workbook("Tareas", headers, rows)
+        return excel_response(workbook, "tareas")
 
 
 class WorkOrderViewSet(AuditModelViewSet):
@@ -116,6 +185,120 @@ class WorkOrderViewSet(AuditModelViewSet):
     def pdf(self, request, pk=None):
         work_order = self.get_object()
         return pdf_response(generate_work_order_pdf(work_order), f"orden_{work_order.order_number}")
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        if query_bool(request):
+            headers = [
+                "Orden",
+                "Cliente",
+                "Vehiculo",
+                "Patente",
+                "Tipo item",
+                "Codigo/Tarea",
+                "Detalle",
+                "Cantidad/Tiempo",
+                "Operario/Estado",
+                "Costo unitario",
+                "Total",
+            ]
+            rows = []
+            for order in queryset:
+                has_items = False
+                for task in order.tasks.exclude(status=TaskStatus.CANCELLED).select_related("operator", "task_template").order_by("execution_order", "created_at"):
+                    has_items = True
+                    rows.append(
+                        [
+                            order.order_number,
+                            order.client.full_name,
+                            f"{order.vehicle.brand} {order.vehicle.model}",
+                            order.vehicle.plate,
+                            "Tarea",
+                            task.task_template.name if task.task_template else task.title,
+                            task.description or task.title,
+                            _minutes(task.estimated_minutes),
+                            task.operator.full_name if task.operator else _display(task, "status"),
+                            "",
+                            task.labor_cost,
+                        ]
+                    )
+                for item in order.parts.exclude(status="returned").select_related("part").order_by("created_at"):
+                    has_items = True
+                    rows.append(
+                        [
+                            order.order_number,
+                            order.client.full_name,
+                            f"{order.vehicle.brand} {order.vehicle.model}",
+                            order.vehicle.plate,
+                            "Repuesto",
+                            item.part.code,
+                            item.part.name,
+                            item.quantity,
+                            _display(item, "status"),
+                            item.unit_cost,
+                            item.total_cost,
+                        ]
+                    )
+                for item in order.materials.exclude(status="returned").select_related("material").order_by("created_at"):
+                    has_items = True
+                    rows.append(
+                        [
+                            order.order_number,
+                            order.client.full_name,
+                            f"{order.vehicle.brand} {order.vehicle.model}",
+                            order.vehicle.plate,
+                            "Material",
+                            item.material.code,
+                            item.material.name,
+                            item.quantity,
+                            _display(item, "status"),
+                            item.unit_cost,
+                            item.total_cost,
+                        ]
+                    )
+                if not has_items:
+                    rows.append([order.order_number, order.client.full_name, f"{order.vehicle.brand} {order.vehicle.model}", order.vehicle.plate, "Sin items", "", "", "", "", "", ""])
+            workbook = build_workbook("Ordenes con items", headers, rows)
+            return excel_response(workbook, "ordenes_con_items")
+
+        headers = [
+            "Orden",
+            "Cliente",
+            "Vehiculo",
+            "Patente",
+            "Estado",
+            "Prioridad",
+            "Ingreso",
+            "Entrega estimada",
+            "Tareas",
+            "Avance %",
+            "Mano de obra",
+            "Materiales",
+            "Repuestos",
+            "Subtotal",
+        ]
+        rows = [
+            [
+                order.order_number,
+                order.client.full_name,
+                f"{order.vehicle.brand} {order.vehicle.model}",
+                order.vehicle.plate,
+                _display(order, "status"),
+                _display(order, "priority"),
+                order.entry_date,
+                order.estimated_delivery_date,
+                f"{order.tasks_completed}/{order.tasks_total}",
+                order.progress_percent,
+                order.labor_amount,
+                order.materials_amount,
+                order.parts_amount,
+                order.subtotal_amount,
+            ]
+            for order in queryset
+        ]
+        workbook = build_workbook("Ordenes de trabajo", headers, rows)
+        return excel_response(workbook, "ordenes")
 
     @action(detail=True, methods=["get", "post"])
     def tasks(self, request, pk=None):

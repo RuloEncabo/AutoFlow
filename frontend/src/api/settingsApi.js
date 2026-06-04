@@ -20,3 +20,8 @@ export async function updateWorkshopProfile(payload) {
   });
   return response.data;
 }
+
+export async function sendSettingsTestEmail(recipient) {
+  const response = await apiClient.post("/settings/workshop-profile/test-email/", { recipient });
+  return response.data;
+}

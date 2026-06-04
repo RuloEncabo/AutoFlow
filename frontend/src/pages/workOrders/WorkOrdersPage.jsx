@@ -3,6 +3,7 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import SearchIcon from "@mui/icons-material/Search";
 import {
@@ -28,7 +29,7 @@ import { listTasks as listTaskCatalog } from "../../api/tasksApi.js";
 import { listVehicles } from "../../api/vehiclesApi.js";
 import {
   changeWorkOrderStatus, completeWorkOrderTask, createWorkOrder, createWorkOrderTask, deleteWorkOrder,
-  downloadWorkOrderPdf, listWorkOrders, listWorkOrderTasks, updateWorkOrder,
+  downloadWorkOrderPdf, exportWorkOrders, listWorkOrders, listWorkOrderTasks, updateWorkOrder,
 } from "../../api/workOrdersApi.js";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import StatusChip from "../../components/StatusChip.jsx";
@@ -89,6 +90,7 @@ export default function WorkOrdersPage() {
   const [taskForm, setTaskForm] = useState(emptyTask);
   const [partForm, setPartForm] = useState(emptyPartUsage);
   const [materialForm, setMaterialForm] = useState(emptyMaterialUsage);
+  const [toast, setToast] = useState(null);
 
   const ordersQuery = useQuery({ queryKey: ["work-orders", page, rowsPerPage, search], queryFn: () => listWorkOrders({ page: page + 1, page_size: rowsPerPage, search: search || undefined }) });
   const clientsQuery = useQuery({ queryKey: ["clients", "options"], queryFn: () => listClients({ page_size: 100 }) });
@@ -172,12 +174,25 @@ export default function WorkOrdersPage() {
     setMaterialForm((current) => ({ ...current, material: event.target.value, unit_cost: material?.cost || "" }));
   };
 
+  const handleExport = async (withItems = false) => {
+    try {
+      await exportWorkOrders(withItems);
+    } catch (error) {
+      setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo exportar ordenes.") });
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap">
         <Box><Typography variant="h4">Ordenes de trabajo</Typography><Typography color="text.secondary">Gestion de estados, tareas y avance operativo.</Typography></Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>Nueva orden</Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(false)}>Excel</Button>
+          <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(true)}>Excel con items</Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>Nueva orden</Button>
+        </Stack>
       </Box>
+      {toast && <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert>}
       <Card><CardContent>
         <TextField fullWidth placeholder="Buscar por orden, cliente, patente o descripcion" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} sx={{ mb: 2 }} />
         {ordersQuery.isError && <Alert severity="error">{getApiErrorMessage(ordersQuery.error)}</Alert>}

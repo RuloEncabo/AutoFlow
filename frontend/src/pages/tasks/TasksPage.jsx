@@ -1,6 +1,7 @@
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import SearchIcon from "@mui/icons-material/Search";
 import {
   Alert,
@@ -31,7 +32,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { createTask, deleteTask, listTasks, updateTask } from "../../api/tasksApi.js";
+import { createTask, deleteTask, exportTasks, listTasks, updateTask } from "../../api/tasksApi.js";
 import { getApiErrorMessage } from "../../api/errorUtils.js";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import StatusChip from "../../components/StatusChip.jsx";
@@ -83,6 +84,7 @@ export default function TasksPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyTask);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const tasksQuery = useQuery({
     queryKey: ["task-catalog", { page, rowsPerPage, search }],
@@ -148,6 +150,14 @@ export default function TasksPage() {
     setForm((current) => ({ ...current, [field]: numericFields.includes(field) ? Number(event.target.value) : event.target.value }));
   };
 
+  const handleExport = async (withItems = false) => {
+    try {
+      await exportTasks(withItems);
+    } catch (error) {
+      setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo exportar tareas.") });
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} flexWrap="wrap">
@@ -157,10 +167,20 @@ export default function TasksPage() {
             Catalogo de tareas reutilizables con descripcion y tiempo previsto.
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          Nueva tarea
-        </Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(false)}>
+            Excel
+          </Button>
+          <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(true)}>
+            Excel con items
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            Nueva tarea
+          </Button>
+        </Stack>
       </Box>
+
+      {toast && <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert>}
 
       <Card>
         <CardContent>

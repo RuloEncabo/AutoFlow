@@ -5,8 +5,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .emailing import send_configured_email
 from .permissions import IsAdminOrReadOnly
-from .serializers import HealthSerializer, WorkshopProfileSerializer
+from .serializers import EmailTestSerializer, HealthSerializer, WorkshopProfileSerializer
 from .services import get_workshop_profile
 
 
@@ -46,3 +47,24 @@ class WorkshopProfileView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class WorkshopEmailTestView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
+    @extend_schema(request=EmailTestSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = EmailTestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile = get_workshop_profile()
+        send_configured_email(
+            subject="Prueba de correo AutoFlow",
+            text_body=(
+                f"Hola.\n\n"
+                f"Este es un correo de prueba enviado desde {profile.name}.\n"
+                "La configuracion SMTP esta operativa."
+            ),
+            recipients=[serializer.validated_data["recipient"]],
+            profile=profile,
+        )
+        return Response({"detail": "Correo de prueba enviado correctamente."})

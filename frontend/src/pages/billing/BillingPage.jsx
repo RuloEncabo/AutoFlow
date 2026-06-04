@@ -1,5 +1,6 @@
 import AddIcon from "@mui/icons-material/Add";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import PaidIcon from "@mui/icons-material/Paid";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
@@ -13,7 +14,7 @@ import { useState } from "react";
 
 import {
   approveEstimate, createEstimate, createInvoice, createPayment,
-  createMercadoPagoPreference, downloadEstimatePdf, downloadInvoicePdf, listEstimates, listInvoices,
+  createMercadoPagoPreference, downloadEstimatePdf, downloadInvoicePdf, exportEstimates, exportInvoices, listEstimates, listInvoices,
 } from "../../api/billingApi.js";
 import { getApiErrorMessage } from "../../api/errorUtils.js";
 import { listWorkOrders } from "../../api/workOrdersApi.js";
@@ -120,11 +121,24 @@ export default function BillingPage() {
     }
   };
 
+  const handleExport = async (withItems = false) => {
+    try {
+      const exportFn = tab === "estimates" ? exportEstimates : exportInvoices;
+      await exportFn(withItems);
+    } catch (error) {
+      setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo exportar el modulo.") });
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap">
         <Box><Typography variant="h4">Facturacion</Typography><Typography color="text.secondary">Presupuestos, facturas y pagos.</Typography></Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>Nuevo {tab === "estimates" ? "presupuesto" : "factura"}</Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(false)}>Excel</Button>
+          <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => handleExport(true)}>Excel con items</Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>Nuevo {tab === "estimates" ? "presupuesto" : "factura"}</Button>
+        </Stack>
       </Box>
       {toast && <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert>}
       <Card><CardContent>

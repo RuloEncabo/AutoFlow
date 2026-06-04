@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db.models import Sum
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -7,6 +9,7 @@ from rest_framework.views import APIView
 
 from apps.audit.models import AuditAction
 from apps.audit.services import create_audit_log
+from apps.core.excel import build_workbook, excel_response, query_bool
 from apps.core.permissions import IsAdminOrAdministrationForDelete
 from apps.core.pdf import generate_estimate_pdf, generate_invoice_pdf, pdf_response
 from apps.core.viewsets import AuditModelViewSet, snapshot_instance
@@ -23,6 +26,40 @@ from .serializers import (
     PaymentSerializer,
 )
 from .services import generate_invoice_number
+
+
+def _display(instance, field):
+    method = getattr(instance, f"get_{field}_display", None)
+    if callable(method):
+        return method()
+    return getattr(instance, field, "")
+
+
+def _minutes(value):
+    total = int(value or 0)
+    hours, minutes = divmod(total, 60)
+    if hours and minutes:
+        return f"{hours} h {minutes} min"
+    if hours:
+        return f"{hours} h"
+    return f"{minutes} min"
+
+
+def _work_order_item_rows(work_order):
+    for task in work_order.tasks.exclude(status="cancelled").select_related("operator", "task_template").order_by("execution_order", "created_at"):
+        yield [
+            "Tarea",
+            task.task_template.name if task.task_template else task.title,
+            task.description or task.title,
+            _minutes(task.estimated_minutes),
+            task.operator.full_name if task.operator else "",
+            "",
+            task.labor_cost,
+        ]
+    for item in work_order.parts.exclude(status="returned").select_related("part").order_by("created_at"):
+        yield ["Repuesto", item.part.code, item.part.name, item.quantity, _display(item, "status"), item.unit_cost, item.total_cost]
+    for item in work_order.materials.exclude(status="returned").select_related("material").order_by("created_at"):
+        yield ["Material", item.material.code, item.material.name, item.quantity, _display(item, "status"), item.unit_cost, item.total_cost]
 
 
 class EstimateViewSet(AuditModelViewSet):
@@ -62,6 +99,62 @@ class EstimateViewSet(AuditModelViewSet):
         estimate = self.get_object()
         return pdf_response(generate_estimate_pdf(estimate), f"presupuesto_{estimate.work_order.order_number}")
 
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset()).prefetch_related(
+            "work_order__tasks",
+            "work_order__parts",
+            "work_order__materials",
+        )
+        if query_bool(request):
+            headers = [
+                "Presupuesto",
+                "Orden",
+                "Cliente",
+                "Patente",
+                "Tipo item",
+                "Codigo/Tarea",
+                "Detalle",
+                "Cantidad/Tiempo",
+                "Operario/Estado",
+                "Costo unitario",
+                "Total",
+            ]
+            rows = []
+            for estimate in queryset:
+                work_order = estimate.work_order
+                has_items = False
+                for item in _work_order_item_rows(work_order):
+                    has_items = True
+                    rows.append([str(estimate.id), work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, *item])
+                if estimate.extra_amount:
+                    has_items = True
+                    rows.append([str(estimate.id), work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, "Adicional", "", estimate.extra_description or "Adicional", 1, "", "", estimate.extra_amount])
+                if not has_items:
+                    rows.append([str(estimate.id), work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, "Sin items", "", "", "", "", "", ""])
+            workbook = build_workbook("Presupuestos con items", headers, rows)
+            return excel_response(workbook, "presupuestos_con_items")
+
+        headers = ["Orden", "Cliente", "Patente", "Estado", "Mano de obra", "Materiales", "Repuestos", "Adicional", "Total", "Creado", "Aprobado"]
+        rows = [
+            [
+                estimate.work_order.order_number,
+                estimate.work_order.client.full_name,
+                estimate.work_order.vehicle.plate,
+                _display(estimate, "status"),
+                estimate.labor_amount,
+                estimate.materials_amount,
+                estimate.parts_amount,
+                estimate.extra_amount,
+                estimate.total_amount,
+                estimate.created_at,
+                estimate.approved_at,
+            ]
+            for estimate in queryset
+        ]
+        workbook = build_workbook("Presupuestos", headers, rows)
+        return excel_response(workbook, "presupuestos")
+
 
 class InvoiceViewSet(AuditModelViewSet):
     audit_module = "billing_invoices"
@@ -96,6 +189,93 @@ class InvoiceViewSet(AuditModelViewSet):
     def pdf(self, request, pk=None):
         invoice = self.get_object()
         return pdf_response(generate_invoice_pdf(invoice), f"factura_{invoice.invoice_number}")
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset()).prefetch_related(
+            "work_order__tasks",
+            "work_order__parts",
+            "work_order__materials",
+            "payments",
+        )
+        if query_bool(request):
+            headers = [
+                "Factura",
+                "Orden",
+                "Cliente",
+                "Patente",
+                "Tipo item",
+                "Codigo/Tarea",
+                "Detalle",
+                "Cantidad/Tiempo",
+                "Operario/Estado",
+                "Costo unitario",
+                "Total",
+            ]
+            rows = []
+            for invoice in queryset:
+                work_order = invoice.work_order
+                has_items = False
+                for item in _work_order_item_rows(work_order):
+                    has_items = True
+                    rows.append([invoice.invoice_number, work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, *item])
+                if invoice.extra_amount:
+                    has_items = True
+                    rows.append([invoice.invoice_number, work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, "Adicional", "", invoice.extra_description or "Adicional", 1, "", "", invoice.extra_amount])
+                rows.extend(
+                    [
+                        [invoice.invoice_number, work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, "Descuento", "", f"{invoice.discount_percent}%", "", "", "", invoice.discount_amount],
+                        [invoice.invoice_number, work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, "IVA", "", f"{invoice.tax_percent}%", "", "", "", invoice.tax_amount],
+                    ]
+                )
+                has_items = True
+                for payment in invoice.payments.all():
+                    has_items = True
+                    rows.append([invoice.invoice_number, work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, "Pago", payment.reference, _display(payment, "method"), payment.paid_at, "", "", payment.amount])
+                if not has_items:
+                    rows.append([invoice.invoice_number, work_order.order_number, work_order.client.full_name, work_order.vehicle.plate, "Sin items", "", "", "", "", "", ""])
+            workbook = build_workbook("Facturas con items", headers, rows)
+            return excel_response(workbook, "facturas_con_items")
+
+        headers = [
+            "Factura",
+            "Orden",
+            "Cliente",
+            "Patente",
+            "Fecha",
+            "Subtotal",
+            "Descuento %",
+            "Descuento",
+            "IVA %",
+            "IVA",
+            "Total",
+            "Cobrado",
+            "Saldo",
+            "Estado pago",
+        ]
+        rows = []
+        for invoice in queryset:
+            balance = max(Decimal(invoice.total) - Decimal(invoice.paid_amount), Decimal("0.00"))
+            rows.append(
+                [
+                    invoice.invoice_number,
+                    invoice.work_order.order_number,
+                    invoice.work_order.client.full_name,
+                    invoice.work_order.vehicle.plate,
+                    invoice.issued_at,
+                    invoice.subtotal,
+                    invoice.discount_percent,
+                    invoice.discount_amount,
+                    invoice.tax_percent,
+                    invoice.tax_amount,
+                    invoice.total,
+                    invoice.paid_amount,
+                    balance,
+                    _display(invoice, "payment_status"),
+                ]
+            )
+        workbook = build_workbook("Facturas", headers, rows)
+        return excel_response(workbook, "facturas")
 
     @action(detail=True, methods=["post"], url_path="mercadopago/create-preference")
     def create_mercadopago_preference(self, request, pk=None):

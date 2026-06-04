@@ -17,3 +17,13 @@ export async function meRequest(accessToken) {
   const response = await apiClient.get("/auth/me/", config);
   return response.data;
 }
+
+export async function requestPasswordReset(email) {
+  const response = await apiClient.post("/auth/password-reset/request/", { email });
+  return response.data;
+}
+
+export async function confirmPasswordReset(payload) {
+  const response = await apiClient.post("/auth/password-reset/confirm/", payload);
+  return response.data;
+}

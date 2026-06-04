@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.core.excel import build_workbook, excel_response, query_bool
 from apps.core.permissions import IsInventoryRole, IsWorkOrderInventoryUsageRole
 from apps.core.viewsets import AuditModelViewSet
 
@@ -18,6 +19,13 @@ from .serializers import (
     WorkOrderMaterialSerializer,
     WorkOrderPartSerializer,
 )
+
+
+def _display(instance, field):
+    method = getattr(instance, f"get_{field}_display", None)
+    if callable(method):
+        return method()
+    return getattr(instance, field, "")
 
 
 class StockAdjustmentMixin:
@@ -100,6 +108,71 @@ class PartViewSet(StockAdjustmentMixin, AuditModelViewSet):
     def get_queryset(self):
         return Part.objects.select_related("family")
 
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        if query_bool(request):
+            headers = [
+                "Codigo",
+                "Cod proveedor",
+                "Repuesto",
+                "Familia",
+                "Orden",
+                "Cliente",
+                "Patente",
+                "Cantidad",
+                "Costo unitario",
+                "Total",
+                "Estado consumo",
+                "Fecha",
+            ]
+            usages = WorkOrderPart.objects.select_related(
+                "part",
+                "part__family",
+                "work_order",
+                "work_order__client",
+                "work_order__vehicle",
+            ).filter(part__in=queryset)
+            rows = [
+                [
+                    item.part.code,
+                    item.part.supplier_code,
+                    item.part.name,
+                    item.part.family.name if item.part.family else "",
+                    item.work_order.order_number,
+                    item.work_order.client.full_name,
+                    item.work_order.vehicle.plate,
+                    item.quantity,
+                    item.unit_cost,
+                    item.total_cost,
+                    _display(item, "status"),
+                    item.created_at,
+                ]
+                for item in usages
+            ]
+            workbook = build_workbook("Repuestos con items", headers, rows)
+            return excel_response(workbook, "repuestos_con_items")
+
+        headers = ["Codigo", "Cod proveedor", "Codigo barra", "Codigo QR", "Repuesto", "Familia", "Stock", "Stock minimo", "Costo", "Estado", "Critico"]
+        rows = [
+            [
+                part.code,
+                part.supplier_code,
+                part.barcode,
+                part.qr_code,
+                part.name,
+                part.family.name if part.family else "",
+                part.stock,
+                part.min_stock,
+                part.cost,
+                _display(part, "status"),
+                "Si" if part.stock <= part.min_stock else "No",
+            ]
+            for part in queryset
+        ]
+        workbook = build_workbook("Repuestos", headers, rows)
+        return excel_response(workbook, "repuestos")
+
 
 class MaterialViewSet(StockAdjustmentMixin, AuditModelViewSet):
     audit_module = "inventory_materials"
@@ -113,6 +186,74 @@ class MaterialViewSet(StockAdjustmentMixin, AuditModelViewSet):
 
     def get_queryset(self):
         return Material.objects.select_related("family")
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        if query_bool(request):
+            headers = [
+                "Codigo",
+                "Cod proveedor",
+                "Material",
+                "Tipo",
+                "Familia",
+                "Orden",
+                "Cliente",
+                "Patente",
+                "Cantidad",
+                "Costo unitario",
+                "Total",
+                "Estado consumo",
+                "Fecha",
+            ]
+            usages = WorkOrderMaterial.objects.select_related(
+                "material",
+                "material__family",
+                "work_order",
+                "work_order__client",
+                "work_order__vehicle",
+            ).filter(material__in=queryset)
+            rows = [
+                [
+                    item.material.code,
+                    item.material.supplier_code,
+                    item.material.name,
+                    item.material.type,
+                    item.material.family.name if item.material.family else "",
+                    item.work_order.order_number,
+                    item.work_order.client.full_name,
+                    item.work_order.vehicle.plate,
+                    item.quantity,
+                    item.unit_cost,
+                    item.total_cost,
+                    _display(item, "status"),
+                    item.created_at,
+                ]
+                for item in usages
+            ]
+            workbook = build_workbook("Materiales con items", headers, rows)
+            return excel_response(workbook, "materiales_con_items")
+
+        headers = ["Codigo", "Cod proveedor", "Codigo barra", "Codigo QR", "Material", "Tipo", "Familia", "Stock", "Stock minimo", "Costo", "Estado", "Critico"]
+        rows = [
+            [
+                material.code,
+                material.supplier_code,
+                material.barcode,
+                material.qr_code,
+                material.name,
+                material.type,
+                material.family.name if material.family else "",
+                material.stock,
+                material.min_stock,
+                material.cost,
+                _display(material, "status"),
+                "Si" if material.stock <= material.min_stock else "No",
+            ]
+            for material in queryset
+        ]
+        workbook = build_workbook("Materiales", headers, rows)
+        return excel_response(workbook, "materiales")
 
 
 class WorkOrderPartViewSet(AuditModelViewSet):

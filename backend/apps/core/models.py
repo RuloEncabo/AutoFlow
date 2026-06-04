@@ -84,6 +84,18 @@ class WorkshopProfile(TimeStampedModel):
     estimate_header_title = models.CharField(max_length=120, default="Presupuesto")
     invoice_header_title = models.CharField(max_length=120, default="Factura")
     document_footer = models.TextField(blank=True)
+    email_service_enabled = models.BooleanField(default=True)
+    email_from_name = models.CharField(max_length=180, blank=True)
+    email_from_address = models.EmailField(blank=True)
+    smtp_host = models.CharField(max_length=180, blank=True)
+    smtp_port = models.PositiveIntegerField(default=587)
+    smtp_username = models.CharField(max_length=180, blank=True)
+    smtp_password = models.CharField(max_length=255, blank=True)
+    smtp_use_tls = models.BooleanField(default=True)
+    smtp_use_ssl = models.BooleanField(default=False)
+    password_reset_enabled = models.BooleanField(default=True)
+    password_reset_token_minutes = models.PositiveIntegerField(default=60)
+    password_reset_frontend_url = models.URLField(blank=True, max_length=500)
 
     class Meta:
         verbose_name = "perfil del taller"

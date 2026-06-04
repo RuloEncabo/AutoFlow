@@ -1,4 +1,5 @@
 import { apiClient } from "./axiosClient.js";
+import { downloadBlobResponse } from "./downloadUtils.js";
 
 export async function listTasks(params = {}) {
   const response = await apiClient.get("/tasks/", { params });
@@ -17,4 +18,12 @@ export async function updateTask(id, payload) {
 
 export async function deleteTask(id) {
   await apiClient.delete(`/tasks/${id}/`);
+}
+
+export async function exportTasks(withItems = false) {
+  const response = await apiClient.get("/tasks/export/", {
+    params: { with_items: withItems ? 1 : 0 },
+    responseType: "blob",
+  });
+  downloadBlobResponse(response, withItems ? "tareas_con_items.xlsx" : "tareas.xlsx");
 }

@@ -1,4 +1,5 @@
 import { apiClient } from "./axiosClient.js";
+import { downloadBlobResponse } from "./downloadUtils.js";
 
 export async function listFamilies(params = {}) {
   const response = await apiClient.get("/inventory/families/", { params });
@@ -43,6 +44,14 @@ export async function lookupPartByScan(code) {
   return response.data;
 }
 
+export async function exportParts(withItems = false) {
+  const response = await apiClient.get("/inventory/parts/export/", {
+    params: { with_items: withItems ? 1 : 0 },
+    responseType: "blob",
+  });
+  downloadBlobResponse(response, withItems ? "repuestos_con_items.xlsx" : "repuestos.xlsx");
+}
+
 export async function listMaterials(params = {}) {
   const response = await apiClient.get("/inventory/materials/", { params });
   return response.data;
@@ -65,6 +74,14 @@ export async function deleteMaterial(id) {
 export async function lookupMaterialByScan(code) {
   const response = await apiClient.post("/inventory/materials/scan-lookup/", { code });
   return response.data;
+}
+
+export async function exportMaterials(withItems = false) {
+  const response = await apiClient.get("/inventory/materials/export/", {
+    params: { with_items: withItems ? 1 : 0 },
+    responseType: "blob",
+  });
+  downloadBlobResponse(response, withItems ? "materiales_con_items.xlsx" : "materiales.xlsx");
 }
 
 export async function listWorkOrderParts(params = {}) {

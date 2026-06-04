@@ -6,7 +6,9 @@ import AuditPage from "../pages/audit/AuditPage.jsx";
 import AppointmentsPage from "../pages/appointments/AppointmentsPage.jsx";
 import BillingPage from "../pages/billing/BillingPage.jsx";
 import ClientsPage from "../pages/clients/ClientsPage.jsx";
+import ForgotPasswordPage from "../pages/login/ForgotPasswordPage.jsx";
 import LoginPage from "../pages/login/LoginPage.jsx";
+import ResetPasswordPage from "../pages/login/ResetPasswordPage.jsx";
 import DashboardPage from "../pages/dashboard/DashboardPage.jsx";
 import InventoryPage from "../pages/inventory/InventoryPage.jsx";
 import OperatorsPage from "../pages/operators/OperatorsPage.jsx";
@@ -26,6 +28,14 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: "/reset-password/:uid/:token",
+    element: <ResetPasswordPage />,
   },
   {
     path: "/",

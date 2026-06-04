@@ -1,8 +1,10 @@
+import logging
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
@@ -15,10 +17,18 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.audit.models import SessionEvent
 from apps.audit.services import create_session_audit
 from apps.core.permissions import IsAdminRole
-from .serializers import LogoutSerializer, UserProfileSerializer, UserSerializer
+from .password_reset import reset_password, send_password_reset_email
+from .serializers import (
+    LogoutSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    UserProfileSerializer,
+    UserSerializer,
+)
 
 
 User = get_user_model()
+logger = logging.getLogger("notifications")
 
 
 class LoginView(TokenObtainPairView):
@@ -99,6 +109,51 @@ class LogoutView(APIView):
             metadata={"email": request.user.email},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(request=PasswordResetRequestSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            send_password_reset_email(email=serializer.validated_data["email"], request=request)
+        except ValueError as exc:
+            raise ValidationError({"email": str(exc)}) from exc
+        except Exception as exc:
+            logger.exception("password reset email failed")
+            raise ValidationError({"email": "No se pudo enviar el correo de recuperacion. Revise la configuracion SMTP."}) from exc
+        return Response(
+            {
+                "detail": (
+                    "Si el email corresponde a un usuario activo, se enviara un enlace "
+                    "para restablecer la contrasena."
+                )
+            }
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(request=PasswordResetConfirmSerializer, responses={200: dict})
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            reset_password(
+                user=serializer.validated_data["user"],
+                token=serializer.validated_data["token"],
+                new_password=serializer.validated_data["new_password"],
+                request=request,
+            )
+        except ValueError as exc:
+            raise ValidationError({"token": str(exc)}) from exc
+        return Response({"detail": "Contrasena actualizada correctamente."})
 
 
 class UserViewSet(ModelViewSet):

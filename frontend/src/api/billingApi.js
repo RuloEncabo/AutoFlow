@@ -26,6 +26,14 @@ export async function downloadEstimatePdf(id, fallbackName = "presupuesto.pdf") 
   downloadBlobResponse(response, fallbackName);
 }
 
+export async function exportEstimates(withItems = false) {
+  const response = await apiClient.get("/billing/estimates/export/", {
+    params: { with_items: withItems ? 1 : 0 },
+    responseType: "blob",
+  });
+  downloadBlobResponse(response, withItems ? "presupuestos_con_items.xlsx" : "presupuestos.xlsx");
+}
+
 export async function listInvoices(params = {}) {
   const response = await apiClient.get("/billing/invoices/", { params });
   return response.data;
@@ -39,6 +47,14 @@ export async function createInvoice(payload) {
 export async function downloadInvoicePdf(id, fallbackName = "factura.pdf") {
   const response = await apiClient.get(`/billing/invoices/${id}/pdf/`, { responseType: "blob" });
   downloadBlobResponse(response, fallbackName);
+}
+
+export async function exportInvoices(withItems = false) {
+  const response = await apiClient.get("/billing/invoices/export/", {
+    params: { with_items: withItems ? 1 : 0 },
+    responseType: "blob",
+  });
+  downloadBlobResponse(response, withItems ? "facturas_con_items.xlsx" : "facturas.xlsx");
 }
 
 export async function createMercadoPagoPreference(id) {

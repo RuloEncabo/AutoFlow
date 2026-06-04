@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { Link as RouterLink, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import LockIcon from "@mui/icons-material/Lock";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
@@ -17,34 +16,41 @@ import {
   Typography,
 } from "@mui/material";
 
+import { confirmPasswordReset } from "../../api/authApi.js";
+import { getApiErrorMessage } from "../../api/errorUtils.js";
 import LogoMark from "../../components/LogoMark.jsx";
-import { login } from "../../auth/authSlice.js";
 
-export default function LoginPage() {
-  const dispatch = useDispatch();
+export default function ResetPasswordPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { accessToken, status, error } = useSelector((state) => state.auth);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { uid, token } = useParams();
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const from = location.state?.from?.pathname || "/dashboard";
-
-  useEffect(() => {
-    if (accessToken) {
-      navigate(from, { replace: true });
-    }
-  }, [accessToken, from, navigate]);
-
-  if (accessToken) {
-    return <Navigate to={from} replace />;
-  }
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const result = await dispatch(login({ email, password }));
-    if (login.fulfilled.match(result)) {
-      navigate(from, { replace: true });
+    if (newPassword !== confirmPassword) {
+      setStatus("error");
+      setMessage("Las contrasenas no coinciden.");
+      return;
+    }
+    setStatus("loading");
+    setMessage("");
+    try {
+      const response = await confirmPasswordReset({
+        uid,
+        token,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+      setStatus("success");
+      setMessage(response.detail || "Contrasena actualizada correctamente.");
+      window.setTimeout(() => navigate("/login", { replace: true }), 1200);
+    } catch (error) {
+      setStatus("error");
+      setMessage(getApiErrorMessage(error, "No se pudo actualizar la contrasena."));
     }
   };
 
@@ -78,31 +84,22 @@ export default function LoginPage() {
           <Stack alignItems="center" spacing={1}>
             <LogoMark compact />
             <Typography variant="h4" color="white">
-              Iniciar sesion
+              Nueva contrasena
             </Typography>
           </Stack>
         </Box>
         <CardContent sx={{ p: 3 }}>
           <Stack component="form" spacing={2.25} onSubmit={handleSubmit}>
             <Typography color="text.secondary" textAlign="center">
-              Acceso seguro a la plataforma AutoFlow.
+              Defina una nueva contrasena para ingresar a AutoFlow.
             </Typography>
-            {error && <Alert severity="error">{error}</Alert>}
+            {message && <Alert severity={status === "success" ? "success" : "error"}>{message}</Alert>}
             <TextField
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              required
-              fullWidth
-            />
-            <TextField
-              label="Contrasena"
+              label="Nueva contrasena"
               type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              autoComplete="new-password"
               required
               fullWidth
               InputProps={{
@@ -113,28 +110,27 @@ export default function LoginPage() {
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton
-                      aria-label="Mostrar u ocultar contrasena"
-                      onClick={() => setShowPassword((value) => !value)}
-                      edge="end"
-                    >
+                    <IconButton aria-label="Mostrar u ocultar contrasena" onClick={() => setShowPassword((value) => !value)} edge="end">
                       {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
             />
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={status === "loading"}
+            <TextField
+              label="Repetir contrasena"
+              type={showPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              autoComplete="new-password"
+              required
               fullWidth
-            >
-              {status === "loading" ? "Ingresando..." : "Ingresar"}
+            />
+            <Button type="submit" variant="contained" size="large" disabled={status === "loading"} fullWidth>
+              {status === "loading" ? "Guardando..." : "Cambiar contrasena"}
             </Button>
-            <Button component={RouterLink} to="/forgot-password" variant="text">
-              Olvide mi contrasena
+            <Button component={RouterLink} to="/login" variant="text">
+              Volver al login
             </Button>
           </Stack>
         </CardContent>
