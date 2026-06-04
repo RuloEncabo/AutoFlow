@@ -44,6 +44,12 @@ class WorkshopProfileSerializer(serializers.ModelSerializer):
             "password_reset_enabled",
             "password_reset_token_minutes",
             "password_reset_frontend_url",
+            "mobile_api_enabled",
+            "mobile_default_api_url",
+            "mobile_photo_upload_enabled",
+            "mobile_require_damage_photo",
+            "mobile_max_photo_mb",
+            "mobile_offline_sync_enabled",
             "created_at",
             "updated_at",
         )
@@ -67,6 +73,9 @@ class WorkshopProfileSerializer(serializers.ModelSerializer):
         token_minutes = attrs.get("password_reset_token_minutes", getattr(self.instance, "password_reset_token_minutes", 60))
         if token_minutes < 5:
             raise serializers.ValidationError({"password_reset_token_minutes": "El vencimiento minimo es de 5 minutos."})
+        max_photo_mb = attrs.get("mobile_max_photo_mb", getattr(self.instance, "mobile_max_photo_mb", 8))
+        if max_photo_mb < 1 or max_photo_mb > 30:
+            raise serializers.ValidationError({"mobile_max_photo_mb": "El tamano maximo debe estar entre 1 y 30 MB."})
         return attrs
 
     def update(self, instance, validated_data):

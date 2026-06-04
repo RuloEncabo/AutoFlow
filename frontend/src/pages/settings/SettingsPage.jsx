@@ -43,6 +43,12 @@ const emptyForm = {
   password_reset_enabled: true,
   password_reset_token_minutes: 60,
   password_reset_frontend_url: "",
+  mobile_api_enabled: true,
+  mobile_default_api_url: "",
+  mobile_photo_upload_enabled: true,
+  mobile_require_damage_photo: false,
+  mobile_max_photo_mb: 8,
+  mobile_offline_sync_enabled: true,
   logoFile: null,
 };
 
@@ -78,6 +84,12 @@ export default function SettingsPage() {
       password_reset_enabled: Boolean(profileQuery.data.password_reset_enabled),
       password_reset_token_minutes: profileQuery.data.password_reset_token_minutes || 60,
       password_reset_frontend_url: profileQuery.data.password_reset_frontend_url || "",
+      mobile_api_enabled: Boolean(profileQuery.data.mobile_api_enabled),
+      mobile_default_api_url: profileQuery.data.mobile_default_api_url || "",
+      mobile_photo_upload_enabled: Boolean(profileQuery.data.mobile_photo_upload_enabled),
+      mobile_require_damage_photo: Boolean(profileQuery.data.mobile_require_damage_photo),
+      mobile_max_photo_mb: profileQuery.data.mobile_max_photo_mb || 8,
+      mobile_offline_sync_enabled: Boolean(profileQuery.data.mobile_offline_sync_enabled),
       logoFile: null,
     }));
     setTestRecipient(profileQuery.data.email_from_address || profileQuery.data.email || "");
@@ -273,6 +285,56 @@ export default function SettingsPage() {
                         Enviar prueba
                       </Button>
                     </Stack>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="h6">APK y sincronizacion movil</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Estos parametros permiten que lo cargado desde el telefono se sincronice con la aplicacion web.
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <FormControlLabel
+                      control={<Checkbox checked={form.mobile_api_enabled} onChange={updateChecked("mobile_api_enabled")} />}
+                      label="Habilitar API movil"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <FormControlLabel
+                      control={<Checkbox checked={form.mobile_photo_upload_enabled} onChange={updateChecked("mobile_photo_upload_enabled")} />}
+                      label="Permitir fotos desde APK"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <FormControlLabel
+                      control={<Checkbox checked={form.mobile_offline_sync_enabled} onChange={updateChecked("mobile_offline_sync_enabled")} />}
+                      label="Permitir sincronizacion offline"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <FormControlLabel
+                      control={<Checkbox checked={form.mobile_require_damage_photo} onChange={updateChecked("mobile_require_damage_photo")} />}
+                      label="Foto obligatoria en danos"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Tamano max foto (MB)"
+                      type="number"
+                      value={form.mobile_max_photo_mb}
+                      onChange={update("mobile_max_photo_mb")}
+                      fullWidth
+                      inputProps={{ min: 1, max: 30 }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={8}>
+                    <TextField
+                      label="URL API para APK"
+                      value={form.mobile_default_api_url}
+                      onChange={update("mobile_default_api_url")}
+                      fullWidth
+                      helperText="Ejemplo: https://autoflow-jl6p.onrender.com/api"
+                    />
                   </Grid>
                 </Grid>
               </Grid>

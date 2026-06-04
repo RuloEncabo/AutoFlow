@@ -21,6 +21,7 @@ def get_workshop_profile() -> WorkshopProfile:
             "smtp_use_tls": settings.EMAIL_USE_TLS,
             "smtp_use_ssl": getattr(settings, "EMAIL_USE_SSL", False),
             "password_reset_frontend_url": f"{settings.FRONTEND_BASE_URL.rstrip('/')}/reset-password",
+            "mobile_default_api_url": f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api",
         },
     )
     return profile

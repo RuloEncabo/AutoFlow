@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "AutoFlow Mobile",
+    "slug": "autoflow-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.autoflow.mobile",
+      "permissions": ["CAMERA"]
+    }
+  }
+}

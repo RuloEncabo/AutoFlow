@@ -35,6 +35,18 @@ class PlateRecognitionResultSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
+class MobileConfigSerializer(serializers.Serializer):
+    mobile_api_enabled = serializers.BooleanField()
+    mobile_default_api_url = serializers.URLField(allow_blank=True)
+    mobile_photo_upload_enabled = serializers.BooleanField()
+    mobile_require_damage_photo = serializers.BooleanField()
+    mobile_max_photo_mb = serializers.IntegerField()
+    mobile_offline_sync_enabled = serializers.BooleanField()
+    workshop_name = serializers.CharField()
+    workshop_phone = serializers.CharField(allow_blank=True)
+    workshop_whatsapp = serializers.CharField(allow_blank=True)
+
+
 def extract_plate(raw_text: str) -> tuple[str, float]:
     normalized = normalize_plate(raw_text or "")
     for pattern in PLATE_PATTERNS:

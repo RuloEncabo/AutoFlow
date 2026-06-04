@@ -2,6 +2,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import CarRepairIcon from "@mui/icons-material/CarRepair";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import GroupsIcon from "@mui/icons-material/Groups";
 import HistoryIcon from "@mui/icons-material/History";
 import InventoryIcon from "@mui/icons-material/Inventory";
@@ -21,6 +22,7 @@ export const navigation = [
   { label: "Operarios", path: "/operators", icon: EngineeringIcon, roles: [ROLES.ADMIN] },
   { label: "Tareas", path: "/tasks", icon: TaskAltIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Turnos", path: "/appointments", icon: CalendarMonthIcon, roles: [ROLES.ADMIN] },
+  { label: "Recepcion", path: "/reception", icon: FactCheckOutlinedIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Ordenes", path: "/work-orders", icon: FactCheckIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Inventario", path: "/inventory", icon: InventoryIcon, roles: [ROLES.ADMIN] },
   { label: "Facturacion", path: "/billing", icon: ReceiptLongIcon, roles: [ROLES.ADMIN, ROLES.ADMINISTRATION] },

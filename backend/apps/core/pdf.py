@@ -748,6 +748,100 @@ def generate_invoice_pdf(invoice):
     return _build_commercial_pdf(profile.invoice_header_title or "Factura", body)
 
 
+def generate_reception_pdf(reception):
+    profile = get_workshop_profile()
+
+    def _status_mark(value, expected):
+        return "X" if value == expected else ""
+
+    def body(elements, styles):
+        client = reception.client
+        vehicle = reception.vehicle
+        client_lines = [
+            _p("Emitido a:", styles["CommercialLabel"]),
+            _p(client.full_name, styles["CommercialName"]),
+            _p(getattr(client, "address", "") or "-", styles["CommercialText"]),
+            _p(getattr(client, "city", "") or "", styles["CommercialText"]),
+            _p(getattr(client, "email", "") or "", styles["CommercialText"]),
+            _p(getattr(client, "phone", "") or "", styles["CommercialText"]),
+            Spacer(1, 2),
+            _p(f"Vehiculo: {vehicle.brand} {vehicle.model}", styles["CommercialText"]),
+            _p(f"Patente: {vehicle.plate}", styles["CommercialText"]),
+        ]
+        summary = [
+            _p("CHECK RECEPCION", styles["CommercialTitle"]),
+            _commercial_summary_card(
+                [
+                    ("Nro:", reception.reception_number),
+                    ("Fecha:", _date(reception.received_at)),
+                    ("Estado:", reception.get_status_display()),
+                ],
+                styles,
+            ),
+            _p(f"Origen: {reception.get_source_display()}", styles["SmallMuted"]),
+        ]
+        intro = Table([[client_lines, summary]], colWidths=[58 * mm, 122 * mm], hAlign="LEFT")
+        intro.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
+        elements.append(intro)
+
+        info = [
+            [_p("Conductor", styles["CommercialLabel"]), _p(reception.driver_name or "-", styles["CommercialText"]), _p("Telefono", styles["CommercialLabel"]), _p(reception.driver_phone or "-", styles["CommercialText"])],
+            [_p("Kilometraje", styles["CommercialLabel"]), _p(reception.odometer_km or "-", styles["CommercialText"]), _p("Combustible", styles["CommercialLabel"]), _p(f"{reception.fuel_level}%", styles["CommercialText"])],
+            [_p("Orden", styles["CommercialLabel"]), _p(reception.work_order.order_number if reception.work_order else "-", styles["CommercialText"]), _p("Documento", styles["CommercialLabel"]), _p(reception.driver_document or "-", styles["CommercialText"])],
+        ]
+        elements.append(_table(info, widths=[32 * mm, 58 * mm, 32 * mm, 58 * mm], header=False))
+        elements.append(Spacer(1, 8))
+
+        checklist = list(reception.checklist_items.all())
+        checklist_rows = [[_p("Check de recepcion", styles["CommercialLabel"]), _p("OK", styles["CommercialLabel"]), _p("Problema", styles["CommercialLabel"]), _p("Obs.", styles["CommercialLabel"])]]
+        for item in checklist:
+            checklist_rows.append([
+                _p(item.label, styles["CommercialText"]),
+                _p(_status_mark(item.status, "ok"), styles["CellBold"]),
+                _p(_status_mark(item.status, "problem"), styles["TotalRedLabel"] if item.status == "problem" else styles["Cell"]),
+                _p(item.notes or "", styles["CommercialText"]),
+            ])
+        if len(checklist_rows) == 1:
+            checklist_rows.append([_p("Sin items de recepcion", styles["CommercialText"]), "", "", ""])
+        checklist_table = _table(checklist_rows, widths=[75 * mm, 15 * mm, 20 * mm, 70 * mm])
+
+        inspection = list(reception.inspection_items.all())
+        inspection_rows = [[_p("Inspeccion multipunto", styles["CommercialLabel"]), _p("Resultado", styles["CommercialLabel"]), _p("Obs.", styles["CommercialLabel"])]]
+        for item in inspection:
+            inspection_rows.append([
+                _p(f"{item.section} - {item.label}", styles["CommercialText"]),
+                _p(item.get_result_display(), styles["TotalRedLabel"] if item.result == "immediate_attention" else styles["CommercialText"]),
+                _p(item.notes or "", styles["CommercialText"]),
+            ])
+        if len(inspection_rows) == 1:
+            inspection_rows.append([_p("Sin inspeccion multipunto", styles["CommercialText"]), "", ""])
+        inspection_table = _table(inspection_rows, widths=[82 * mm, 42 * mm, 56 * mm])
+
+        elements.append(checklist_table)
+        elements.append(Spacer(1, 8))
+        elements.append(inspection_table)
+        elements.append(Spacer(1, 8))
+
+        damage_rows = [[_p("Zona", styles["CommercialLabel"]), _p("Pieza", styles["CommercialLabel"]), _p("Accion", styles["CommercialLabel"]), _p("Descripcion", styles["CommercialLabel"])]]
+        for damage in reception.damages.all():
+            damage_rows.append([
+                _p(damage.get_zone_display(), styles["CommercialText"]),
+                _p(damage.part_name or damage.damage_type or "-", styles["CommercialText"]),
+                _p(damage.get_action_required_display(), styles["CommercialText"]),
+                _p(damage.description or "-", styles["CommercialText"]),
+            ])
+        if len(damage_rows) == 1:
+            damage_rows.append([_p("Sin danos registrados", styles["CommercialText"]), "", "", ""])
+        elements.append(_table(damage_rows, widths=[34 * mm, 45 * mm, 35 * mm, 66 * mm]))
+
+        if reception.notes:
+            elements.append(Spacer(1, 8))
+            elements.append(_p("Observaciones", styles["CommercialLabel"]))
+            elements.append(_p(reception.notes, styles["CommercialText"]))
+
+    return _build_commercial_pdf("Check recepcion", body)
+
+
 def estimate_number(invoice):
     if not invoice.estimate_id:
         return "-"

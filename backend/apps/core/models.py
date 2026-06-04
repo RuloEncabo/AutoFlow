@@ -96,6 +96,12 @@ class WorkshopProfile(TimeStampedModel):
     password_reset_enabled = models.BooleanField(default=True)
     password_reset_token_minutes = models.PositiveIntegerField(default=60)
     password_reset_frontend_url = models.URLField(blank=True, max_length=500)
+    mobile_api_enabled = models.BooleanField(default=True)
+    mobile_default_api_url = models.URLField(blank=True, max_length=500)
+    mobile_photo_upload_enabled = models.BooleanField(default=True)
+    mobile_require_damage_photo = models.BooleanField(default=False)
+    mobile_max_photo_mb = models.PositiveIntegerField(default=8)
+    mobile_offline_sync_enabled = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "perfil del taller"

@@ -12,6 +12,7 @@ import ResetPasswordPage from "../pages/login/ResetPasswordPage.jsx";
 import DashboardPage from "../pages/dashboard/DashboardPage.jsx";
 import InventoryPage from "../pages/inventory/InventoryPage.jsx";
 import OperatorsPage from "../pages/operators/OperatorsPage.jsx";
+import ReceptionPage from "../pages/reception/ReceptionPage.jsx";
 import SettingsPage from "../pages/settings/SettingsPage.jsx";
 import TasksPage from "../pages/tasks/TasksPage.jsx";
 import TvDashboardPage from "../pages/tvDashboard/TvDashboardPage.jsx";
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: withRoles(<DashboardPage />, [ROLES.ADMIN, ROLES.OPERATIVE, ROLES.ADMINISTRATION]) },
       { path: "appointments", element: withRoles(<AppointmentsPage />, [ROLES.ADMIN]) },
+      { path: "reception", element: withRoles(<ReceptionPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
       { path: "clients", element: withRoles(<ClientsPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
       { path: "vehicles", element: withRoles(<VehiclesPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
       { path: "operators", element: withRoles(<OperatorsPage />, [ROLES.ADMIN]) },
