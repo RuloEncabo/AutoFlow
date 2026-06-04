@@ -21,6 +21,12 @@ TEXT = colors.HexColor("#2F2B3D")
 MUTED = colors.HexColor("#6D6777")
 BORDER = colors.HexColor("#D9D9E3")
 LIGHT_BG = colors.HexColor("#F7F8FA")
+COMMERCIAL_BLUE = colors.HexColor("#0B84F3")
+COMMERCIAL_TITLE = colors.HexColor("#B8B8B8")
+COMMERCIAL_DARK = colors.HexColor("#202124")
+COMMERCIAL_GRAY = colors.HexColor("#7A7A7A")
+COMMERCIAL_ROW = colors.HexColor("#F4F6FA")
+COMMERCIAL_RED = colors.HexColor("#FF2D2D")
 
 
 def _styles():
@@ -34,6 +40,22 @@ def _styles():
     base.add(ParagraphStyle(name="CellRight", parent=base["BodyText"], fontSize=8.4, textColor=TEXT, leading=10, alignment=2))
     base.add(ParagraphStyle(name="CellBold", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=8.4, textColor=TEXT, leading=10))
     base.add(ParagraphStyle(name="CellBoldRight", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=8.4, textColor=TEXT, leading=10, alignment=2))
+    base.add(ParagraphStyle(name="CommercialTitle", parent=base["Title"], fontName="Helvetica", fontSize=31, textColor=COMMERCIAL_TITLE, alignment=1, leading=34, spaceAfter=8))
+    base.add(ParagraphStyle(name="CommercialLabel", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=9, textColor=COMMERCIAL_DARK, leading=12))
+    base.add(ParagraphStyle(name="CommercialText", parent=base["BodyText"], fontName="Helvetica", fontSize=8.5, textColor=COMMERCIAL_GRAY, leading=11))
+    base.add(ParagraphStyle(name="CommercialName", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=11, textColor=COMMERCIAL_DARK, leading=13))
+    base.add(ParagraphStyle(name="SummaryLabel", parent=base["BodyText"], fontName="Helvetica", fontSize=8.2, textColor=COMMERCIAL_GRAY, leading=10))
+    base.add(ParagraphStyle(name="SummaryValue", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=10.5, textColor=COMMERCIAL_BLUE, leading=13))
+    base.add(ParagraphStyle(name="ItemTitle", parent=base["BodyText"], fontName="Helvetica", fontSize=9.5, textColor=COMMERCIAL_DARK, leading=12))
+    base.add(ParagraphStyle(name="ItemDetail", parent=base["BodyText"], fontName="Helvetica", fontSize=8.3, textColor=COMMERCIAL_GRAY, leading=10))
+    base.add(ParagraphStyle(name="CommercialFooterBlue", parent=base["BodyText"], fontName="Helvetica", fontSize=10.5, textColor=COMMERCIAL_BLUE, leading=13))
+    base.add(ParagraphStyle(name="TotalLabel", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=8.5, textColor=COMMERCIAL_DARK, leading=11))
+    base.add(ParagraphStyle(name="TotalValue", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=8.5, textColor=COMMERCIAL_DARK, leading=11, alignment=2))
+    base.add(ParagraphStyle(name="TotalRedLabel", parent=base["BodyText"], fontName="Helvetica", fontSize=8.5, textColor=COMMERCIAL_RED, leading=11))
+    base.add(ParagraphStyle(name="TotalRedValue", parent=base["BodyText"], fontName="Helvetica", fontSize=8.5, textColor=COMMERCIAL_RED, leading=11, alignment=2))
+    base.add(ParagraphStyle(name="GrandLabel", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=10, textColor=colors.white, leading=13))
+    base.add(ParagraphStyle(name="GrandValue", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=10, textColor=colors.white, leading=13, alignment=2))
+    base.add(ParagraphStyle(name="Signature", parent=base["BodyText"], fontName="Helvetica-Oblique", fontSize=20, textColor=COMMERCIAL_DARK, leading=24, alignment=1))
     return base
 
 
@@ -303,6 +325,249 @@ def _build_pdf(title, body_builder, *, number="", date_value=None, letter="", su
     return buffer.getvalue()
 
 
+def _logo_path(profile):
+    if not profile.logo:
+        return None
+    try:
+        path = Path(profile.logo.path)
+    except Exception:
+        return None
+    return path if path.exists() else None
+
+
+def _draw_logo_or_name(canvas, profile, x, y, width, height, *, color=colors.white):
+    logo_path = _logo_path(profile)
+    if logo_path:
+        canvas.drawImage(str(logo_path), x, y, width=width, height=height, preserveAspectRatio=True, anchor="c", mask="auto")
+        return
+    canvas.setFillColor(color)
+    canvas.setFont("Helvetica-Bold", 10)
+    canvas.drawCentredString(x + width / 2, y + height / 2, profile.name[:22])
+
+
+def _draw_contact_icon(canvas, icon, x, y):
+    canvas.setStrokeColor(colors.white)
+    canvas.setFillColor(colors.white)
+    canvas.setLineWidth(0.8)
+    if icon == "mail":
+        canvas.rect(x + 1.4 * mm, y + 1.8 * mm, 3.2 * mm, 2.6 * mm, stroke=1, fill=0)
+        canvas.line(x + 1.4 * mm, y + 4.4 * mm, x + 3 * mm, y + 3 * mm)
+        canvas.line(x + 4.6 * mm, y + 4.4 * mm, x + 3 * mm, y + 3 * mm)
+    elif icon == "phone":
+        path = canvas.beginPath()
+        path.moveTo(x + 1.8 * mm, y + 4.6 * mm)
+        path.curveTo(x + 2.2 * mm, y + 2.2 * mm, x + 3.8 * mm, y + 1.4 * mm, x + 4.6 * mm, y + 2.2 * mm)
+        canvas.drawPath(path, stroke=1, fill=0)
+        canvas.circle(x + 2.0 * mm, y + 4.5 * mm, 0.45 * mm, stroke=0, fill=1)
+        canvas.circle(x + 4.5 * mm, y + 2.1 * mm, 0.45 * mm, stroke=0, fill=1)
+    else:
+        pin = canvas.beginPath()
+        pin.moveTo(x + 3 * mm, y + 1.2 * mm)
+        pin.curveTo(x + 1.4 * mm, y + 3.3 * mm, x + 1.8 * mm, y + 5.0 * mm, x + 3 * mm, y + 5.0 * mm)
+        pin.curveTo(x + 4.2 * mm, y + 5.0 * mm, x + 4.6 * mm, y + 3.3 * mm, x + 3 * mm, y + 1.2 * mm)
+        canvas.drawPath(pin, stroke=1, fill=0)
+        canvas.circle(x + 3 * mm, y + 3.8 * mm, 0.55 * mm, stroke=1, fill=0)
+
+
+def _draw_contact(canvas, x, y, icon, line_one, line_two=""):
+    canvas.setFillColor(COMMERCIAL_BLUE)
+    canvas.roundRect(x, y + 9 * mm, 6 * mm, 6 * mm, 2 * mm, fill=1, stroke=0)
+    _draw_contact_icon(canvas, icon, x, y + 9 * mm)
+    canvas.setFillColor(COMMERCIAL_GRAY)
+    canvas.setFont("Helvetica", 8)
+    canvas.drawCentredString(x + 20 * mm, y + 10 * mm, line_one or "-")
+    canvas.drawCentredString(x + 20 * mm, y + 4.5 * mm, line_two or "")
+
+
+def _draw_commercial_page(canvas, doc):
+    profile = get_workshop_profile()
+    width, height = A4
+    canvas.saveState()
+    canvas.setFillColor(COMMERCIAL_BLUE)
+    canvas.rect(0, height - 10 * mm, width, 10 * mm, fill=1, stroke=0)
+    shape = canvas.beginPath()
+    shape.moveTo(0, height)
+    shape.lineTo(82 * mm, height)
+    shape.lineTo(65 * mm, height - 34 * mm)
+    shape.lineTo(0, height - 34 * mm)
+    shape.close()
+    canvas.drawPath(shape, fill=1, stroke=0)
+    _draw_logo_or_name(canvas, profile, 10 * mm, height - 30 * mm, 42 * mm, 20 * mm)
+
+    email = profile.email_from_address or profile.email or ""
+    phone = profile.phone or profile.whatsapp or ""
+    schedule = "Lunes a viernes"
+    address = profile.address or ""
+    _draw_contact(canvas, 82 * mm, height - 30 * mm, "mail", email, profile.email or "")
+    _draw_contact(canvas, 118 * mm, height - 30 * mm, "phone", phone, schedule)
+    _draw_contact(canvas, 160 * mm, height - 30 * mm, "pin", address[:28], address[28:58])
+
+    footer_y = 55 * mm
+    canvas.setStrokeColor(BORDER)
+    canvas.setLineWidth(0.7)
+    canvas.line(0, footer_y, width, footer_y)
+    canvas.setFillColor(COMMERCIAL_BLUE)
+    canvas.setFont("Helvetica", 11)
+    canvas.drawString(16 * mm, 43 * mm, "Gracias por su preferencia.")
+    canvas.setFillColor(COMMERCIAL_DARK)
+    canvas.setFont("Helvetica-Bold", 7.5)
+    canvas.drawString(16 * mm, 33 * mm, "Terminos y condiciones")
+    canvas.setFillColor(COMMERCIAL_GRAY)
+    canvas.setFont("Helvetica", 7)
+    footer_text = profile.document_footer or "Documento generado por AutoFlow."
+    canvas.drawString(16 * mm, 28 * mm, footer_text[:115])
+    _draw_logo_or_name(canvas, profile, width - 42 * mm, 30 * mm, 28 * mm, 16 * mm, color=COMMERCIAL_DARK)
+    canvas.restoreState()
+
+
+def _build_commercial_pdf(title, body_builder):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=16 * mm,
+        leftMargin=16 * mm,
+        topMargin=38 * mm,
+        bottomMargin=62 * mm,
+    )
+    elements = []
+    body_builder(elements, _styles())
+    doc.build(elements, onFirstPage=_draw_commercial_page, onLaterPages=_draw_commercial_page)
+    return buffer.getvalue()
+
+
+def _commercial_summary_card(items, styles):
+    cells = []
+    for label, value in items:
+        cells.append([_p(label, styles["SummaryLabel"]), _p(value, styles["SummaryValue"])])
+    table = Table([cells], colWidths=[41 * mm] * len(cells), hAlign="RIGHT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.7, BORDER),
+                ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BG),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+    return table
+
+
+def _commercial_intro(title, work_order, *, number, date_value, total, status, styles):
+    client = work_order.client
+    vehicle = work_order.vehicle
+    client_lines = [
+        _p("Emitido a:", styles["CommercialLabel"]),
+        _p(client.full_name, styles["CommercialName"]),
+        _p(getattr(client, "address", "") or "-", styles["CommercialText"]),
+        _p(getattr(client, "city", "") or "", styles["CommercialText"]),
+        _p(getattr(client, "email", "") or "", styles["CommercialText"]),
+        _p(getattr(client, "phone", "") or "", styles["CommercialText"]),
+        Spacer(1, 2),
+        _p(f"Vehiculo: {vehicle.brand} {vehicle.model}", styles["CommercialText"]),
+        _p(f"Patente: {vehicle.plate}", styles["CommercialText"]),
+    ]
+    summary = [
+        _p(title.upper(), styles["CommercialTitle"]),
+        _commercial_summary_card(
+            [
+                ("Nro:", number),
+                ("Fecha:", _date(date_value)),
+                ("Total:", _money(total)),
+            ],
+            styles,
+        ),
+        _p(f"Estado: {status}", styles["SmallMuted"]) if status else Spacer(1, 1),
+    ]
+    intro = Table([[client_lines, summary]], colWidths=[58 * mm, 122 * mm], hAlign="LEFT")
+    intro.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
+    return intro
+
+
+def _commercial_item_cell(title, detail, styles):
+    return [_p(title, styles["ItemTitle"]), _p(detail or "", styles["ItemDetail"])]
+
+
+def _commercial_items_rows(work_order, styles):
+    rows = []
+    for task in work_order.tasks.exclude(status="cancelled").select_related("operator", "task_template").order_by("execution_order", "created_at"):
+        detail = task.description or task.task_template.description if task.task_template else task.description
+        if task.operator:
+            detail = f"{detail or ''}\nOperario: {task.operator.full_name}".strip()
+        rows.append([_commercial_item_cell(task.title, detail, styles), _money(task.labor_cost), "1", _money(task.labor_cost)])
+    for item in work_order.parts.exclude(status="returned").select_related("part").order_by("created_at"):
+        rows.append([_commercial_item_cell(item.part.name, f"Repuesto {item.part.code}", styles), _money(item.unit_cost), _quantity(item.quantity), _money(item.total_cost)])
+    for item in work_order.materials.exclude(status="returned").select_related("material").order_by("created_at"):
+        rows.append([_commercial_item_cell(item.material.name, f"Material {item.material.code}", styles), _money(item.unit_cost), _quantity(item.quantity), _money(item.total_cost)])
+    return rows
+
+
+def _commercial_items_table(rows, styles):
+    data = [[_p("Item", styles["CommercialLabel"]), _p("Precio", styles["CommercialLabel"]), _p("Cant.", styles["CommercialLabel"]), _p("Total", styles["CommercialLabel"])]]
+    for row in rows:
+        data.append([row[0], _p(row[1], styles["CellRight"]), _p(row[2], styles["CellRight"]), _p(row[3], styles["CellRight"])])
+    if len(data) == 1:
+        data.append([_commercial_item_cell("Sin items registrados", "", styles), "", "", ""])
+    table = Table(data, colWidths=[104 * mm, 27 * mm, 23 * mm, 36 * mm], hAlign="LEFT", repeatRows=1)
+    style = [
+        ("BOX", (0, 0), (-1, -1), 0.7, BORDER),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.7, BORDER),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+    ]
+    for row_index in range(1, len(data)):
+        if row_index % 2:
+            style.append(("BACKGROUND", (0, row_index), (-1, row_index), COMMERCIAL_ROW))
+    table.setStyle(TableStyle(style))
+    return table
+
+
+def _commercial_payment_block(title, lines, styles):
+    data = [[_p(title, styles["CommercialLabel"])]]
+    for label, value in lines:
+        data.append([_p(label, styles["CommercialLabel"])])
+        data.append([_p(value, styles["CommercialText"])])
+    table = Table(data, colWidths=[82 * mm], hAlign="LEFT")
+    table.setStyle(TableStyle([("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+    return table
+
+
+def _commercial_totals_table(rows, grand_label, grand_value, styles):
+    data = []
+    for label, value, color in rows:
+        label_style = styles["TotalRedLabel"] if color == "red" else styles["TotalLabel"]
+        value_style = styles["TotalRedValue"] if color == "red" else styles["TotalValue"]
+        data.append([_p(label, label_style), _p(_money(value), value_style)])
+    data.append([_p(grand_label, styles["GrandLabel"]), _p(_money(grand_value), styles["GrandValue"])])
+    table = Table(data, colWidths=[44 * mm, 38 * mm], hAlign="RIGHT")
+    table_style = [
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("BACKGROUND", (0, -1), (-1, -1), COMMERCIAL_BLUE),
+        ("TEXTCOLOR", (0, -1), (-1, -1), colors.white),
+        ("LINEBEFORE", (1, -1), (1, -1), 0.6, colors.white),
+    ]
+    table.setStyle(TableStyle(table_style))
+    return table
+
+
+def _commercial_bottom(payment, totals):
+    table = Table([[payment, totals]], colWidths=[95 * mm, 85 * mm], hAlign="LEFT")
+    table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 10)]))
+    return table
+
+
 def pdf_response(content: bytes, filename: str):
     response = HttpResponse(content, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{_filename(filename)}.pdf"'
@@ -352,54 +617,61 @@ def generate_estimate_pdf(estimate):
     work_order = estimate.work_order
 
     def body(elements, styles):
-        elements.extend(_info_box("Datos del cliente y vehiculo", _client_vehicle_rows(work_order), styles))
-        elements.extend(
-            _info_box(
-                "Datos del presupuesto",
-                [
-                    ("Orden", work_order.order_number, "Estado", _display(estimate, "status")),
-                    ("Fecha", _datetime(estimate.created_at), "Aprobado", _datetime(estimate.approved_at)),
-                    ("Entrega estimada", _date(work_order.estimated_delivery_date), "Patente", work_order.vehicle.plate),
-                ],
-                styles,
-            )
-        )
-        elements.append(_p("Detalle presupuestado", styles["Section"]))
-        elements.append(_line_items(work_order, styles))
-        if estimate.extra_amount:
-            elements.append(
-                _table(
-                    [
-                        [_p("Item adicional", styles["CellBold"]), _p("Importe", styles["CellBoldRight"])],
-                        [_p(estimate.extra_description or "Adicional", styles["Cell"]), _p(_money(estimate.extra_amount), styles["CellRight"])],
-                    ],
-                    widths=[134 * mm, 36 * mm],
-                    numeric_cols=(1,),
-                )
-            )
-        elements.append(_p("Resumen", styles["Section"]))
         elements.append(
-            _totals_table(
-                [
-                    ("Mano de obra", estimate.labor_amount, False),
-                    ("Materiales", estimate.materials_amount, False),
-                    ("Repuestos", estimate.parts_amount, False),
-                    (estimate.extra_description or "Item adicional", estimate.extra_amount, False),
-                    ("Total presupuesto", estimate.total_amount, True),
-                ],
-                styles,
+            _commercial_intro(
+                profile.estimate_header_title or "Presupuesto",
+                work_order,
+                number=work_order.order_number,
+                date_value=estimate.created_at,
+                total=estimate.total_amount,
+                status=_display(estimate, "status"),
+                styles=styles,
             )
         )
-        elements.append(_p("Valores sujetos a disponibilidad de repuestos/materiales y vigencia comercial del taller.", styles["SmallMuted"]))
+        rows = _commercial_items_rows(work_order, styles)
+        if estimate.extra_amount:
+            rows.append(
+                [
+                    _commercial_item_cell(estimate.extra_description or "Adicional", "Item adicional del presupuesto", styles),
+                    _money(estimate.extra_amount),
+                    "1",
+                    _money(estimate.extra_amount),
+                ]
+            )
+        elements.append(
+            _commercial_items_table(rows, styles)
+        )
+        payment = _commercial_payment_block(
+            "Condiciones:",
+            [
+                ("Orden de trabajo:", work_order.order_number),
+                ("Validez:", "Valores sujetos a disponibilidad de repuestos y materiales."),
+                ("Entrega estimada:", _date(work_order.estimated_delivery_date)),
+            ],
+            styles,
+        )
+        totals = _commercial_totals_table(
+            [
+                ("Sub Total", estimate.labor_amount + estimate.materials_amount + estimate.parts_amount, "dark"),
+                ("Adicional", estimate.extra_amount, "dark"),
+            ],
+            "Gran Total",
+            estimate.total_amount,
+            styles,
+        )
+        elements.append(_commercial_bottom(payment, totals))
+        elements.append(Spacer(1, 18))
+        elements.append(
+            Table(
+                [
+                    ["", _p("Firma y aclaracion", styles["CommercialText"])],
+                ],
+                colWidths=[110 * mm, 70 * mm],
+                hAlign="LEFT",
+            )
+        )
 
-    return _build_pdf(
-        profile.estimate_header_title or "Presupuesto",
-        body,
-        number=work_order.order_number,
-        date_value=estimate.created_at,
-        subtitle="Comprobante de presupuesto",
-        status=_display(estimate, "status"),
-    )
+    return _build_commercial_pdf(profile.estimate_header_title or "Presupuesto", body)
 
 
 def generate_invoice_pdf(invoice):
@@ -408,76 +680,72 @@ def generate_invoice_pdf(invoice):
     balance = Decimal(invoice.total) - Decimal(invoice.paid_amount)
 
     def body(elements, styles):
-        elements.extend(_info_box("Datos del cliente y vehiculo", _client_vehicle_rows(work_order), styles))
-        elements.extend(
-            _info_box(
-                "Datos de facturacion",
-                [
-                    ("Factura", invoice.invoice_number, "Estado pago", _display(invoice, "payment_status")),
-                    ("Orden", work_order.order_number, "Emision", _datetime(invoice.issued_at)),
-                    ("Presupuesto", estimate_number(invoice), "Patente", work_order.vehicle.plate),
-                ],
-                styles,
-            )
-        )
-        elements.append(_p("Detalle facturado", styles["Section"]))
-        elements.append(_line_items(work_order, styles))
-        if invoice.extra_amount:
-            elements.append(
-                _table(
-                    [
-                        [_p("Item adicional", styles["CellBold"]), _p("Importe", styles["CellBoldRight"])],
-                        [_p(invoice.extra_description or "Adicional", styles["Cell"]), _p(_money(invoice.extra_amount), styles["CellRight"])],
-                    ],
-                    widths=[134 * mm, 36 * mm],
-                    numeric_cols=(1,),
-                )
-            )
-
-        elements.append(_p("Liquidacion", styles["Section"]))
         elements.append(
-            _totals_table(
-                [
-                    ("Subtotal", invoice.subtotal, False),
-                    (f"Descuento {invoice.discount_percent}%", invoice.discount_amount, False),
-                    ("Base imponible", invoice.taxable_amount, False),
-                    (f"IVA {invoice.tax_percent}%", invoice.tax_amount, False),
-                    ("Total", invoice.total, True),
-                    ("Cobrado", invoice.paid_amount, False),
-                    ("Saldo", max(balance, Decimal("0.00")), True),
-                ],
-                styles,
+            _commercial_intro(
+                profile.invoice_header_title or "Factura",
+                work_order,
+                number=invoice.invoice_number,
+                date_value=invoice.issued_at,
+                total=invoice.total,
+                status=_display(invoice, "payment_status"),
+                styles=styles,
             )
         )
-
-        payments = list(invoice.payments.all())
-        elements.append(_p("Pagos registrados", styles["Section"]))
-        rows = [[_p("Fecha", styles["CellBold"]), _p("Metodo", styles["CellBold"]), _p("Referencia", styles["CellBold"]), _p("Monto", styles["CellBoldRight"])]]
-        for payment in payments:
+        rows = _commercial_items_rows(work_order, styles)
+        if invoice.extra_amount:
             rows.append(
                 [
-                    _p(_datetime(payment.paid_at), styles["Cell"]),
-                    _p(_display(payment, "method"), styles["Cell"]),
-                    _p(payment.reference or "-", styles["Cell"]),
-                    _p(_money(payment.amount), styles["CellRight"]),
+                    _commercial_item_cell(invoice.extra_description or "Adicional", "Item adicional de la factura", styles),
+                    _money(invoice.extra_amount),
+                    "1",
+                    _money(invoice.extra_amount),
                 ]
             )
-        if len(rows) == 1:
-            rows.append([_p("Sin pagos registrados", styles["Cell"]), "", "", ""])
-        elements.append(_table(rows, widths=[42 * mm, 38 * mm, 55 * mm, 35 * mm], numeric_cols=(3,)))
+        elements.append(_commercial_items_table(rows, styles))
+        payment = _commercial_payment_block(
+            "Datos de pago:",
+            [
+                ("Estado:", _display(invoice, "payment_status")),
+                ("Orden de trabajo:", work_order.order_number),
+                ("Presupuesto:", estimate_number(invoice)),
+            ],
+            styles,
+        )
+        totals = _commercial_totals_table(
+            [
+                ("Sub Total", invoice.subtotal, "dark"),
+                (f"Descuento {invoice.discount_percent}%", invoice.discount_amount, "red"),
+                (f"IVA {invoice.tax_percent}%", invoice.tax_amount, "dark"),
+                ("Cobrado", invoice.paid_amount, "dark"),
+                ("Saldo", max(balance, Decimal("0.00")), "dark"),
+            ],
+            "Gran Total",
+            invoice.total,
+            styles,
+        )
+        elements.append(_commercial_bottom(payment, totals))
+        elements.append(Spacer(1, 16))
+        signature = Table(
+            [
+                [
+                    "",
+                    _p("Firma", styles["Signature"]),
+                ],
+                [
+                    "",
+                    _p("Responsable administrativo", styles["CommercialText"]),
+                ],
+            ],
+            colWidths=[110 * mm, 70 * mm],
+            hAlign="LEFT",
+        )
+        signature.setStyle(TableStyle([("ALIGN", (1, 0), (1, -1), "CENTER"), ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        elements.append(signature)
         if invoice.notes:
-            elements.append(_p("Observaciones", styles["Section"]))
-            elements.append(_p(invoice.notes, styles["Cell"]))
+            elements.append(Spacer(1, 6))
+            elements.append(_p(invoice.notes, styles["CommercialText"]))
 
-    return _build_pdf(
-        profile.invoice_header_title or "Factura",
-        body,
-        number=invoice.invoice_number,
-        date_value=invoice.issued_at,
-        letter="B",
-        subtitle="Comprobante de gestion no fiscal - sin CAE",
-        status=_display(invoice, "payment_status"),
-    )
+    return _build_commercial_pdf(profile.invoice_header_title or "Factura", body)
 
 
 def estimate_number(invoice):
