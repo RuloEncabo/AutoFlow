@@ -18,6 +18,22 @@ npm run start
 npm run build:apk
 ```
 
+Antes de generar la APK con EAS se requiere una cuenta de Expo:
+
+```bash
+npx eas-cli@20.0.0 login
+npm run build:apk
+```
+
+En entornos no interactivos se puede usar un token:
+
+```bash
+set EXPO_TOKEN=tu_token_de_expo
+npm run build:apk
+```
+
+El perfil `preview` definido en `eas.json` genera un APK instalable para Android.
+
 Para que el telefono sincronice contra produccion, configurar en la app:
 
 ```text
