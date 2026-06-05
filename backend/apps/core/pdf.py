@@ -40,13 +40,13 @@ def _styles():
     base.add(ParagraphStyle(name="CellRight", parent=base["BodyText"], fontSize=8.4, textColor=TEXT, leading=10, alignment=2))
     base.add(ParagraphStyle(name="CellBold", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=8.4, textColor=TEXT, leading=10))
     base.add(ParagraphStyle(name="CellBoldRight", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=8.4, textColor=TEXT, leading=10, alignment=2))
-    base.add(ParagraphStyle(name="CommercialTitle", parent=base["Title"], fontName="Helvetica", fontSize=31, textColor=COMMERCIAL_TITLE, alignment=1, leading=34, spaceAfter=8))
+    base.add(ParagraphStyle(name="CommercialTitle", parent=base["Title"], fontName="Helvetica", fontSize=34, textColor=COMMERCIAL_TITLE, alignment=1, leading=37, spaceAfter=8))
     base.add(ParagraphStyle(name="CommercialLabel", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=9, textColor=COMMERCIAL_DARK, leading=12))
     base.add(ParagraphStyle(name="CommercialText", parent=base["BodyText"], fontName="Helvetica", fontSize=8.5, textColor=COMMERCIAL_GRAY, leading=11))
-    base.add(ParagraphStyle(name="CommercialName", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=11, textColor=COMMERCIAL_DARK, leading=13))
+    base.add(ParagraphStyle(name="CommercialName", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=12, textColor=COMMERCIAL_DARK, leading=14))
     base.add(ParagraphStyle(name="SummaryLabel", parent=base["BodyText"], fontName="Helvetica", fontSize=8.2, textColor=COMMERCIAL_GRAY, leading=10))
     base.add(ParagraphStyle(name="SummaryValue", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=10.5, textColor=COMMERCIAL_BLUE, leading=13))
-    base.add(ParagraphStyle(name="ItemTitle", parent=base["BodyText"], fontName="Helvetica", fontSize=9.5, textColor=COMMERCIAL_DARK, leading=12))
+    base.add(ParagraphStyle(name="ItemTitle", parent=base["BodyText"], fontName="Helvetica", fontSize=10.2, textColor=COMMERCIAL_DARK, leading=13))
     base.add(ParagraphStyle(name="ItemDetail", parent=base["BodyText"], fontName="Helvetica", fontSize=8.3, textColor=COMMERCIAL_GRAY, leading=10))
     base.add(ParagraphStyle(name="CommercialFooterBlue", parent=base["BodyText"], fontName="Helvetica", fontSize=10.5, textColor=COMMERCIAL_BLUE, leading=13))
     base.add(ParagraphStyle(name="TotalLabel", parent=base["BodyText"], fontName="Helvetica-Bold", fontSize=8.5, textColor=COMMERCIAL_DARK, leading=11))
@@ -457,11 +457,24 @@ def _commercial_summary_card(items, styles):
     return table
 
 
-def _commercial_intro(title, work_order, *, number, date_value, total, status, styles):
+def _commercial_intro(
+    title,
+    work_order,
+    *,
+    number,
+    date_value,
+    total,
+    status,
+    styles,
+    recipient_label="Emitido a:",
+    number_label="Nro:",
+    date_label="Fecha:",
+    total_label="Total:",
+):
     client = work_order.client
     vehicle = work_order.vehicle
     client_lines = [
-        _p("Emitido a:", styles["CommercialLabel"]),
+        _p(recipient_label, styles["CommercialLabel"]),
         _p(client.full_name, styles["CommercialName"]),
         _p(getattr(client, "address", "") or "-", styles["CommercialText"]),
         _p(getattr(client, "city", "") or "", styles["CommercialText"]),
@@ -475,9 +488,9 @@ def _commercial_intro(title, work_order, *, number, date_value, total, status, s
         _p(title.upper(), styles["CommercialTitle"]),
         _commercial_summary_card(
             [
-                ("Nro:", number),
-                ("Fecha:", _date(date_value)),
-                ("Total:", _money(total)),
+                (number_label, number),
+                (date_label, _date(date_value)),
+                (total_label, _money(total)),
             ],
             styles,
         ),
@@ -626,6 +639,10 @@ def generate_estimate_pdf(estimate):
                 total=estimate.total_amount,
                 status=_display(estimate, "status"),
                 styles=styles,
+                recipient_label="Presupuesto a:",
+                number_label="Presupuesto No:",
+                date_label="Fecha:",
+                total_label="Total:",
             )
         )
         rows = _commercial_items_rows(work_order, styles)
@@ -641,9 +658,11 @@ def generate_estimate_pdf(estimate):
         elements.append(
             _commercial_items_table(rows, styles)
         )
+        contact_line = profile.email or profile.email_from_address or profile.phone or profile.whatsapp or "-"
         payment = _commercial_payment_block(
-            "Condiciones:",
+            "Medios y condiciones:",
             [
+                ("Contacto:", contact_line),
                 ("Orden de trabajo:", work_order.order_number),
                 ("Validez:", "Valores sujetos a disponibilidad de repuestos y materiales."),
                 ("Entrega estimada:", _date(work_order.estimated_delivery_date)),
@@ -660,16 +679,17 @@ def generate_estimate_pdf(estimate):
             styles,
         )
         elements.append(_commercial_bottom(payment, totals))
-        elements.append(Spacer(1, 18))
-        elements.append(
-            Table(
-                [
-                    ["", _p("Firma y aclaracion", styles["CommercialText"])],
-                ],
-                colWidths=[110 * mm, 70 * mm],
-                hAlign="LEFT",
-            )
+        elements.append(Spacer(1, 14))
+        signature = Table(
+            [
+                ["", _p("Firma", styles["Signature"])],
+                ["", _p("Conformidad del cliente", styles["CommercialText"])],
+            ],
+            colWidths=[110 * mm, 70 * mm],
+            hAlign="LEFT",
         )
+        signature.setStyle(TableStyle([("ALIGN", (1, 0), (1, -1), "CENTER"), ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        elements.append(signature)
 
     return _build_commercial_pdf(profile.estimate_header_title or "Presupuesto", body)
 
@@ -689,6 +709,10 @@ def generate_invoice_pdf(invoice):
                 total=invoice.total,
                 status=_display(invoice, "payment_status"),
                 styles=styles,
+                recipient_label="Factura a:",
+                number_label="Factura No:",
+                date_label="Fecha factura:",
+                total_label="Gran Total:",
             )
         )
         rows = _commercial_items_rows(work_order, styles)

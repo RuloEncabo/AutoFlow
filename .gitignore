@@ -7,3 +7,6 @@ mobile/node_modules/
 mobile/.expo/
 mobile/.expo-export-check/
 mobile/dist/
+mobile/android/
+mobile/*.apk
+.local-tools/
