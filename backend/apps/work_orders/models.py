@@ -24,6 +24,7 @@ class WorkOrderStatus(models.TextChoices):
     IN_PAINT = "in_paint", "En pintura"
     FINISHED = "finished", "Terminado"
     DELIVERED = "delivered", "Entregado"
+    CLOSED = "closed", "Cerrada"
     CANCELLED = "cancelled", "Cancelado"
 
 
@@ -137,6 +138,10 @@ class WorkOrder(AuditStampedModel):
     @property
     def tasks_completed(self) -> int:
         return self.tasks.filter(status=TaskStatus.COMPLETED).count()
+
+    @property
+    def tasks_pending(self) -> int:
+        return self.tasks.exclude(status__in=[TaskStatus.COMPLETED, TaskStatus.CANCELLED]).count()
 
     @property
     def progress_percent(self) -> int:

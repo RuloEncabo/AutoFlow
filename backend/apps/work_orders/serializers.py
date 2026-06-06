@@ -186,7 +186,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         return f"{obj.vehicle.plate} - {obj.vehicle.brand} {obj.vehicle.model}"
 
     def get_tasks_pending(self, obj):
-        return obj.tasks.exclude(status__in=[TaskStatus.COMPLETED, TaskStatus.CANCELLED]).count()
+        return obj.tasks_pending
 
     def validate(self, attrs):
         client = attrs.get("client", getattr(self.instance, "client", None))

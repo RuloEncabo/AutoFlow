@@ -591,38 +591,58 @@ def generate_work_order_pdf(work_order):
     profile = get_workshop_profile()
 
     def body(elements, styles):
-        elements.extend(_info_box("Datos del cliente y vehiculo", _client_vehicle_rows(work_order), styles))
-        elements.extend(_info_box("Datos de la orden", _work_order_rows(work_order), styles))
-        elements.append(_p("Descripcion del trabajo", styles["Section"]))
-        elements.append(_p(work_order.description or "-", styles["Cell"]))
-        if work_order.notes:
-            elements.append(_p("Observaciones", styles["Section"]))
-            elements.append(_p(work_order.notes, styles["Cell"]))
-
-        elements.append(_p("Detalle de tareas, repuestos y materiales", styles["Section"]))
-        elements.append(_line_items(work_order, styles))
-        elements.append(_p("Resumen", styles["Section"]))
         elements.append(
-            _totals_table(
-                [
-                    ("Mano de obra", work_order.labor_amount, False),
-                    ("Materiales", work_order.materials_amount, False),
-                    ("Repuestos", work_order.parts_amount, False),
-                    ("Subtotal", work_order.subtotal_amount, True),
-                ],
-                styles,
+            _commercial_intro(
+                profile.order_header_title or "Orden de trabajo",
+                work_order,
+                number=work_order.order_number,
+                date_value=work_order.entry_date,
+                total=work_order.subtotal_amount,
+                status=_display(work_order, "status"),
+                styles=styles,
+                recipient_label="Orden a:",
+                number_label="Orden No:",
+                date_label="Ingreso:",
+                total_label="Subtotal:",
             )
         )
-        elements.append(Spacer(1, 18))
-        elements.append(_table([[_p("Firma cliente", styles["SmallMuted"]), _p("Firma taller", styles["SmallMuted"])]], widths=[82 * mm, 82 * mm], header=False))
+        elements.append(_commercial_items_table(_commercial_items_rows(work_order, styles), styles))
+        payment = _commercial_payment_block(
+            "Datos de la orden:",
+            [
+                ("Estado:", _display(work_order, "status")),
+                ("Prioridad:", _display(work_order, "priority")),
+                ("Entrega estimada:", _date(work_order.estimated_delivery_date)),
+                ("Avance:", f"{work_order.tasks_completed}/{work_order.tasks_total} tareas - {work_order.progress_percent}%"),
+                ("Descripcion:", work_order.description or "-"),
+                ("Observaciones:", work_order.notes or "-"),
+            ],
+            styles,
+        )
+        totals = _commercial_totals_table(
+            [
+                ("Mano de obra", work_order.labor_amount, "dark"),
+                ("Materiales", work_order.materials_amount, "dark"),
+                ("Repuestos", work_order.parts_amount, "dark"),
+            ],
+            "Subtotal",
+            work_order.subtotal_amount,
+            styles,
+        )
+        elements.append(_commercial_bottom(payment, totals))
+        elements.append(Spacer(1, 16))
+        signature = Table(
+            [
+                ["", _p("Firma", styles["Signature"])],
+                ["", _p("Conformidad del cliente", styles["CommercialText"])],
+            ],
+            colWidths=[110 * mm, 70 * mm],
+            hAlign="LEFT",
+        )
+        signature.setStyle(TableStyle([("ALIGN", (1, 0), (1, -1), "CENTER"), ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        elements.append(signature)
 
-    return _build_pdf(
-        profile.order_header_title or "Orden de trabajo",
-        body,
-        number=work_order.order_number,
-        date_value=work_order.entry_date,
-        status=_display(work_order, "status"),
-    )
+    return _build_commercial_pdf(profile.order_header_title or "Orden de trabajo", body)
 
 
 def generate_estimate_pdf(estimate):

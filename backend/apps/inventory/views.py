@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from apps.core.excel import build_workbook, excel_response, query_bool
 from apps.core.permissions import IsInventoryRole, IsWorkOrderInventoryUsageRole
 from apps.core.viewsets import AuditModelViewSet
+from apps.work_orders.guards import ensure_work_order_editable
 
 from .filters import InventoryFamilyFilter, MaterialFilter, PartFilter, WorkOrderMaterialFilter, WorkOrderPartFilter
 from .models import InventoryFamily, Material, MovementType, Part, StockMovement, WorkOrderMaterial, WorkOrderPart
@@ -265,6 +266,22 @@ class WorkOrderPartViewSet(AuditModelViewSet):
     def get_queryset(self):
         return WorkOrderPart.objects.select_related("work_order", "part")
 
+    def perform_create(self, serializer):
+        ensure_work_order_editable(serializer.validated_data["work_order"], self.request.user, "agregar repuestos")
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        usage = self.get_object()
+        ensure_work_order_editable(usage.work_order, self.request.user, "modificar repuestos")
+        target_work_order = serializer.validated_data.get("work_order")
+        if target_work_order:
+            ensure_work_order_editable(target_work_order, self.request.user, "modificar repuestos")
+        super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        ensure_work_order_editable(instance.work_order, self.request.user, "borrar repuestos")
+        super().perform_destroy(instance)
+
 
 class WorkOrderMaterialViewSet(AuditModelViewSet):
     audit_module = "work_order_materials"
@@ -274,3 +291,19 @@ class WorkOrderMaterialViewSet(AuditModelViewSet):
 
     def get_queryset(self):
         return WorkOrderMaterial.objects.select_related("work_order", "material")
+
+    def perform_create(self, serializer):
+        ensure_work_order_editable(serializer.validated_data["work_order"], self.request.user, "agregar materiales")
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        usage = self.get_object()
+        ensure_work_order_editable(usage.work_order, self.request.user, "modificar materiales")
+        target_work_order = serializer.validated_data.get("work_order")
+        if target_work_order:
+            ensure_work_order_editable(target_work_order, self.request.user, "modificar materiales")
+        super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        ensure_work_order_editable(instance.work_order, self.request.user, "borrar materiales")
+        super().perform_destroy(instance)

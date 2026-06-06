@@ -11,7 +11,8 @@ from apps.core.pdf import generate_work_order_pdf, pdf_response
 from apps.core.viewsets import AuditModelViewSet, snapshot_instance
 
 from .filters import TaskTemplateFilter, WorkOrderFilter, WorkOrderTaskFilter
-from .models import TaskStatus, TaskTemplate, WorkOrder, WorkOrderStatusHistory, WorkOrderTask
+from .guards import ensure_work_order_can_close, ensure_work_order_editable
+from .models import TaskStatus, TaskTemplate, WorkOrder, WorkOrderStatus, WorkOrderStatusHistory, WorkOrderTask
 from .serializers import (
     TaskTemplateSerializer,
     WorkOrderSerializer,
@@ -146,16 +147,34 @@ class WorkOrderViewSet(AuditModelViewSet):
             new_data=snapshot_instance(instance),
         )
 
+    def perform_update(self, serializer):
+        work_order = self.get_object()
+        ensure_work_order_editable(work_order, self.request.user, "modificarla")
+        target_status = serializer.validated_data.get("status")
+        if target_status == WorkOrderStatus.CLOSED and work_order.status != WorkOrderStatus.CLOSED:
+            ensure_work_order_can_close(work_order)
+            if not work_order.actual_delivery_date:
+                serializer.validated_data["actual_delivery_date"] = timezone.localdate()
+        super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        ensure_work_order_editable(instance, self.request.user, "borrarla")
+        super().perform_destroy(instance)
+
     @action(detail=True, methods=["post"], url_path="change-status")
     def change_status(self, request, pk=None):
         work_order = self.get_object()
         serializer = WorkOrderStatusChangeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        target_status = serializer.validated_data["status"]
+        ensure_work_order_editable(work_order, request.user, "cambiar su estado")
+        if target_status == WorkOrderStatus.CLOSED:
+            ensure_work_order_can_close(work_order)
         old_data = snapshot_instance(work_order)
         old_status = work_order.status
-        work_order.status = serializer.validated_data["status"]
+        work_order.status = target_status
         work_order.updated_by = request.user
-        if work_order.status == "delivered" and not work_order.actual_delivery_date:
+        if work_order.status in {WorkOrderStatus.DELIVERED, WorkOrderStatus.CLOSED} and not work_order.actual_delivery_date:
             work_order.actual_delivery_date = timezone.localdate()
         work_order.save(update_fields=["status", "updated_by", "updated_at", "actual_delivery_date"])
         WorkOrderStatusHistory.objects.create(
@@ -305,6 +324,7 @@ class WorkOrderViewSet(AuditModelViewSet):
         work_order = self.get_object()
         if request.method == "GET":
             return Response(WorkOrderTaskSerializer(work_order.tasks.all(), many=True).data)
+        ensure_work_order_editable(work_order, request.user, "agregar tareas")
         serializer = WorkOrderTaskSerializer(data={**request.data, "work_order": str(work_order.pk)})
         serializer.is_valid(raise_exception=True)
         task = serializer.save(created_by=request.user, updated_by=request.user)
@@ -328,9 +348,26 @@ class WorkOrderTaskViewSet(AuditModelViewSet):
             "operator",
         )
 
+    def perform_create(self, serializer):
+        ensure_work_order_editable(serializer.validated_data["work_order"], self.request.user, "agregar tareas")
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        task = self.get_object()
+        ensure_work_order_editable(task.work_order, self.request.user, "modificar tareas")
+        target_work_order = serializer.validated_data.get("work_order")
+        if target_work_order:
+            ensure_work_order_editable(target_work_order, self.request.user, "modificar tareas")
+        super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        ensure_work_order_editable(instance.work_order, self.request.user, "borrar tareas")
+        super().perform_destroy(instance)
+
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         task = self.get_object()
+        ensure_work_order_editable(task.work_order, request.user, "modificar tareas")
         task.status = TaskStatus.IN_PROGRESS
         task.started_at = task.started_at or timezone.now()
         task.updated_by = request.user
@@ -340,6 +377,7 @@ class WorkOrderTaskViewSet(AuditModelViewSet):
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         task = self.get_object()
+        ensure_work_order_editable(task.work_order, request.user, "cerrar tareas")
         task.status = TaskStatus.COMPLETED
         task.finished_at = timezone.now()
         task.updated_by = request.user

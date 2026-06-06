@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useSelector } from "react-redux";
 
 import { listClients } from "../../api/clientsApi.js";
 import { getApiErrorMessage } from "../../api/errorUtils.js";
@@ -31,13 +32,14 @@ import {
   changeWorkOrderStatus, completeWorkOrderTask, createWorkOrder, createWorkOrderTask, deleteWorkOrder,
   downloadWorkOrderPdf, exportWorkOrders, listWorkOrders, listWorkOrderTasks, updateWorkOrder,
 } from "../../api/workOrdersApi.js";
+import { ROLES } from "../../auth/roles.js";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import StatusChip from "../../components/StatusChip.jsx";
 
 const statuses = [
   ["scheduled", "Programado"], ["received", "Recibido"], ["estimating", "Presupuestando"],
   ["approved", "Aprobado"], ["waiting_parts", "Esperando piezas"], ["in_repair", "En reparacion"],
-  ["in_paint", "En pintura"], ["finished", "Terminado"], ["delivered", "Entregado"], ["cancelled", "Cancelado"],
+  ["in_paint", "En pintura"], ["finished", "Terminado"], ["delivered", "Entregado"], ["closed", "Cerrada"], ["cancelled", "Cancelado"],
 ];
 const priorities = [["low", "Baja"], ["normal", "Normal"], ["high", "Alta"], ["urgent", "Urgente"]];
 const emptyOrder = { client: "", vehicle: "", priority: "normal", status: "scheduled", description: "", notes: "", estimated_delivery_date: "" };
@@ -45,6 +47,20 @@ const emptyTask = { task_template: "", operator: "", title: "", description: "",
 const emptyPartUsage = { part: "", quantity: 1, unit_cost: "" };
 const emptyMaterialUsage = { material: "", quantity: 1, unit_cost: "" };
 const moneyFormatter = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
+const statusColors = {
+  closed: "success",
+  cancelled: "error",
+  delivered: "success",
+  finished: "primary",
+};
+
+function statusLabel(status) {
+  return statuses.find(([value]) => value === status)?.[1] || status;
+}
+
+function statusColor(status) {
+  return statusColors[status] || "primary";
+}
 
 function formatMinutes(minutes) {
   const value = Number(minutes || 0);
@@ -79,9 +95,13 @@ function buildTaskPayload(form) {
 
 export default function WorkOrdersPage() {
   const queryClient = useQueryClient();
+  const user = useSelector((state) => state.auth.user);
+  const isAdmin = user?.role === ROLES.ADMIN;
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [closedPage, setClosedPage] = useState(0);
+  const [closedRowsPerPage, setClosedRowsPerPage] = useState(10);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyOrder);
@@ -92,7 +112,24 @@ export default function WorkOrdersPage() {
   const [materialForm, setMaterialForm] = useState(emptyMaterialUsage);
   const [toast, setToast] = useState(null);
 
-  const ordersQuery = useQuery({ queryKey: ["work-orders", page, rowsPerPage, search], queryFn: () => listWorkOrders({ page: page + 1, page_size: rowsPerPage, search: search || undefined }) });
+  const ordersQuery = useQuery({
+    queryKey: ["work-orders", "active", page, rowsPerPage, search],
+    queryFn: () => listWorkOrders({
+      page: page + 1,
+      page_size: rowsPerPage,
+      search: search || undefined,
+      is_closed: false,
+    }),
+  });
+  const closedOrdersQuery = useQuery({
+    queryKey: ["work-orders", "closed", closedPage, closedRowsPerPage, search],
+    queryFn: () => listWorkOrders({
+      page: closedPage + 1,
+      page_size: closedRowsPerPage,
+      search: search || undefined,
+      is_closed: true,
+    }),
+  });
   const clientsQuery = useQuery({ queryKey: ["clients", "options"], queryFn: () => listClients({ page_size: 100 }) });
   const vehiclesQuery = useQuery({ queryKey: ["vehicles", "options"], queryFn: () => listVehicles({ page_size: 100 }) });
   const taskCatalogQuery = useQuery({ queryKey: ["task-catalog", "options"], queryFn: () => listTaskCatalog({ page_size: 100, status: "active" }) });
@@ -112,15 +149,29 @@ export default function WorkOrdersPage() {
   const orderParts = orderPartsQuery.data?.results || [];
   const orderMaterials = orderMaterialsQuery.data?.results || [];
   const filteredVehicles = form.client ? vehicles.filter((vehicle) => vehicle.client === form.client) : vehicles;
-  const rows = ordersQuery.data?.results || [];
-  const selectedOrder = rows.find((order) => order.id === taskOrder?.id) || taskOrder;
+  const activeRows = ordersQuery.data?.results || [];
+  const closedRows = closedOrdersQuery.data?.results || [];
+  const selectedOrder = [...activeRows, ...closedRows].find((order) => order.id === taskOrder?.id) || taskOrder;
+  const selectedOrderClosed = selectedOrder?.status === "closed";
+  const canEditSelectedOrder = !selectedOrderClosed || isAdmin;
+  const canEditOrder = (order) => order.status !== "closed" || isAdmin;
+  const canCloseOrder = (order) => (
+    order.status !== "closed"
+    && order.status !== "cancelled"
+    && Number(order.tasks_total || 0) > 0
+    && Number(order.tasks_pending || 0) === 0
+  );
 
   const saveMutation = useMutation({
     mutationFn: () => editing ? updateWorkOrder(editing.id, form) : createWorkOrder(form),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["work-orders"] }); closeForm(); },
   });
   const deleteMutation = useMutation({ mutationFn: (id) => deleteWorkOrder(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["work-orders"] }); setDeleteTarget(null); } });
-  const statusMutation = useMutation({ mutationFn: ({ id, status }) => changeWorkOrderStatus(id, status), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["work-orders"] }) });
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }) => changeWorkOrderStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["work-orders"] }),
+    onError: (error) => setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo cambiar el estado de la orden.") }),
+  });
   const taskMutation = useMutation({ mutationFn: () => createWorkOrderTask(taskOrder.id, buildTaskPayload(taskForm)), onSuccess: () => { setTaskForm(emptyTask); queryClient.invalidateQueries({ queryKey: ["work-order-tasks"] }); queryClient.invalidateQueries({ queryKey: ["work-orders"] }); } });
   const completeTaskMutation = useMutation({
     mutationFn: (id) => completeWorkOrderTask(id),
@@ -139,7 +190,15 @@ export default function WorkOrdersPage() {
   });
 
   const openCreate = () => { setEditing(null); setForm({ ...emptyOrder, client: clients[0]?.id || "" }); setFormOpen(true); };
-  const openEdit = (order) => { setEditing(order); setForm({ client: order.client, vehicle: order.vehicle, priority: order.priority, status: order.status, description: order.description, notes: order.notes || "", estimated_delivery_date: order.estimated_delivery_date || "" }); setFormOpen(true); };
+  const openEdit = (order) => {
+    if (!canEditOrder(order)) {
+      setToast({ severity: "warning", message: "La orden esta cerrada. Solo un administrador puede modificarla." });
+      return;
+    }
+    setEditing(order);
+    setForm({ client: order.client, vehicle: order.vehicle, priority: order.priority, status: order.status, description: order.description, notes: order.notes || "", estimated_delivery_date: order.estimated_delivery_date || "" });
+    setFormOpen(true);
+  };
   const closeForm = () => { setFormOpen(false); setEditing(null); setForm(emptyOrder); saveMutation.reset(); };
   const updateForm = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value, ...(field === "client" ? { vehicle: "" } : {}) }));
   const openTaskDialog = (order) => {
@@ -182,6 +241,44 @@ export default function WorkOrdersPage() {
     }
   };
 
+  const renderOrderRows = (tableRows, emptyMessage, isLoading) => (
+    <>
+      {tableRows.map((order) => {
+        const editable = canEditOrder(order);
+        const closable = canCloseOrder(order);
+        const deleteAllowed = isAdmin && editable;
+        return (
+          <TableRow key={order.id} hover>
+            <TableCell><Typography fontWeight={700}>{order.order_number}</Typography><Typography variant="body2" color="text.secondary">{order.estimated_delivery_date || "Sin fecha estimada"}</Typography></TableCell>
+            <TableCell><Typography>{order.client_name}</Typography><Typography variant="body2" color="text.secondary">{order.vehicle_label}</Typography></TableCell>
+            <TableCell><StatusChip label={statusLabel(order.status)} color={statusColor(order.status)} /></TableCell>
+            <TableCell>{priorities.find(([value]) => value === order.priority)?.[1] || order.priority}</TableCell>
+            <TableCell sx={{ minWidth: 160 }}><Typography variant="body2">{order.tasks_completed}/{order.tasks_total} tareas</Typography><LinearProgress variant="determinate" value={order.progress_percent || 0} sx={{ height: 8, borderRadius: 4 }} /></TableCell>
+            <TableCell>{moneyFormatter.format(Number(order.subtotal_amount || 0))}</TableCell>
+            <TableCell align="right">
+              <Tooltip title="Descargar PDF"><IconButton color="primary" onClick={() => downloadWorkOrderPdf(order.id, `${order.order_number}.pdf`)}><PictureAsPdfIcon /></IconButton></Tooltip>
+              <Tooltip title={editable ? "Tareas e insumos" : "Ver detalle"}>
+                <IconButton onClick={() => openTaskDialog(order)}><AssignmentIcon /></IconButton>
+              </Tooltip>
+              {order.status !== "closed" && (
+                <Tooltip title={closable ? "Terminado: cerrar orden" : "Complete todas las tareas para cerrar"}>
+                  <span><IconButton color="success" disabled={!closable || statusMutation.isPending} onClick={() => statusMutation.mutate({ id: order.id, status: "closed" })}><CheckCircleIcon /></IconButton></span>
+                </Tooltip>
+              )}
+              <Tooltip title={editable ? "Editar" : "Solo administrador"}>
+                <span><IconButton disabled={!editable} onClick={() => openEdit(order)}><EditIcon /></IconButton></span>
+              </Tooltip>
+              <Tooltip title={deleteAllowed ? "Dar de baja" : "Solo administrador"}>
+                <span><IconButton color="error" disabled={!deleteAllowed} onClick={() => setDeleteTarget(order)}><DeleteIcon /></IconButton></span>
+              </Tooltip>
+            </TableCell>
+          </TableRow>
+        );
+      })}
+      {!isLoading && tableRows.length === 0 && <TableRow><TableCell colSpan={7}><Typography textAlign="center" color="text.secondary" py={4}>{emptyMessage}</Typography></TableCell></TableRow>}
+    </>
+  );
+
   return (
     <Stack spacing={3}>
       <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap">
@@ -194,28 +291,27 @@ export default function WorkOrdersPage() {
       </Box>
       {toast && <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert>}
       <Card><CardContent>
-        <TextField fullWidth placeholder="Buscar por orden, cliente, patente o descripcion" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} sx={{ mb: 2 }} />
+        <TextField fullWidth placeholder="Buscar por orden, cliente, patente o descripcion" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); setClosedPage(0); }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }} sx={{ mb: 2 }} />
         {ordersQuery.isError && <Alert severity="error">{getApiErrorMessage(ordersQuery.error)}</Alert>}
+        <Typography variant="h6" gutterBottom>Ordenes activas</Typography>
         <TableContainer><Table><TableHead><TableRow><TableCell>Orden</TableCell><TableCell>Cliente / vehiculo</TableCell><TableCell>Estado</TableCell><TableCell>Prioridad</TableCell><TableCell>Avance</TableCell><TableCell>Subtotal</TableCell><TableCell align="right">Acciones</TableCell></TableRow></TableHead>
-          <TableBody>{rows.map((order) => (
-            <TableRow key={order.id} hover>
-              <TableCell><Typography fontWeight={700}>{order.order_number}</Typography><Typography variant="body2" color="text.secondary">{order.estimated_delivery_date || "Sin fecha estimada"}</Typography></TableCell>
-              <TableCell><Typography>{order.client_name}</Typography><Typography variant="body2" color="text.secondary">{order.vehicle_label}</Typography></TableCell>
-              <TableCell><StatusChip label={statuses.find(([v]) => v === order.status)?.[1] || order.status} color="primary" /></TableCell>
-              <TableCell>{priorities.find(([v]) => v === order.priority)?.[1] || order.priority}</TableCell>
-              <TableCell sx={{ minWidth: 160 }}><Typography variant="body2">{order.tasks_completed}/{order.tasks_total} tareas</Typography><LinearProgress variant="determinate" value={order.progress_percent || 0} sx={{ height: 8, borderRadius: 4 }} /></TableCell>
-              <TableCell>{moneyFormatter.format(Number(order.subtotal_amount || 0))}</TableCell>
-              <TableCell align="right">
-                <Tooltip title="Descargar PDF"><IconButton color="primary" onClick={() => downloadWorkOrderPdf(order.id, `${order.order_number}.pdf`)}><PictureAsPdfIcon /></IconButton></Tooltip>
-                <Tooltip title="Tareas"><IconButton onClick={() => openTaskDialog(order)}><AssignmentIcon /></IconButton></Tooltip>
-                <Tooltip title="Marcar terminado"><IconButton color="success" onClick={() => statusMutation.mutate({ id: order.id, status: "finished" })}><CheckCircleIcon /></IconButton></Tooltip>
-                <Tooltip title="Editar"><IconButton onClick={() => openEdit(order)}><EditIcon /></IconButton></Tooltip>
-                <Tooltip title="Dar de baja"><IconButton color="error" onClick={() => setDeleteTarget(order)}><DeleteIcon /></IconButton></Tooltip>
-              </TableCell>
-            </TableRow>
-          ))}{!ordersQuery.isLoading && rows.length === 0 && <TableRow><TableCell colSpan={7}><Typography textAlign="center" color="text.secondary" py={4}>No hay ordenes.</Typography></TableCell></TableRow>}</TableBody>
+          <TableBody>{renderOrderRows(activeRows, "No hay ordenes activas.", ordersQuery.isLoading)}</TableBody>
         </Table></TableContainer>
         <TablePagination component="div" count={ordersQuery.data?.count || 0} page={page} rowsPerPage={rowsPerPage} rowsPerPageOptions={[5, 10, 20]} onPageChange={(_, next) => setPage(next)} onRowsPerPageChange={(event) => { setRowsPerPage(Number(event.target.value)); setPage(0); }} labelRowsPerPage="Filas" />
+      </CardContent></Card>
+
+      <Card><CardContent>
+        <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap" mb={2}>
+          <Box>
+            <Typography variant="h6">Ordenes cerradas</Typography>
+            <Typography variant="body2" color="text.secondary">Ordenes finalizadas, bloqueadas para edicion operativa.</Typography>
+          </Box>
+        </Box>
+        {closedOrdersQuery.isError && <Alert severity="error">{getApiErrorMessage(closedOrdersQuery.error)}</Alert>}
+        <TableContainer><Table><TableHead><TableRow><TableCell>Orden</TableCell><TableCell>Cliente / vehiculo</TableCell><TableCell>Estado</TableCell><TableCell>Prioridad</TableCell><TableCell>Avance</TableCell><TableCell>Subtotal</TableCell><TableCell align="right">Acciones</TableCell></TableRow></TableHead>
+          <TableBody>{renderOrderRows(closedRows, "No hay ordenes cerradas.", closedOrdersQuery.isLoading)}</TableBody>
+        </Table></TableContainer>
+        <TablePagination component="div" count={closedOrdersQuery.data?.count || 0} page={closedPage} rowsPerPage={closedRowsPerPage} rowsPerPageOptions={[5, 10, 20]} onPageChange={(_, next) => setClosedPage(next)} onRowsPerPageChange={(event) => { setClosedRowsPerPage(Number(event.target.value)); setClosedPage(0); }} labelRowsPerPage="Filas" />
       </CardContent></Card>
 
       <Dialog open={formOpen} onClose={closeForm} maxWidth="md" fullWidth><Box component="form" onSubmit={(event) => { event.preventDefault(); saveMutation.mutate(); }}>
@@ -256,6 +352,11 @@ export default function WorkOrdersPage() {
             </Grid>
 
             {taskMutation.isError && <Alert severity="error">{getApiErrorMessage(taskMutation.error)}</Alert>}
+            {selectedOrderClosed && (
+              <Alert severity={canEditSelectedOrder ? "info" : "warning"}>
+                Orden cerrada: {canEditSelectedOrder ? "como administrador puede modificar el detalle." : "solo un administrador puede modificar tareas, mano de obra, repuestos o materiales."}
+              </Alert>
+            )}
             {(taskCatalog.length === 0 || operators.length === 0) && (
               <Alert severity="info">
                 Para asignar tareas a una orden primero debe existir al menos una tarea activa y un operario activo.
@@ -265,26 +366,26 @@ export default function WorkOrdersPage() {
               <Typography variant="h6" gutterBottom>Tareas asignadas</Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} md={4}>
-                  <TextField select label="Tarea" value={taskForm.task_template} onChange={updateTaskTemplate} required fullWidth>
+                  <TextField select label="Tarea" value={taskForm.task_template} onChange={updateTaskTemplate} required fullWidth disabled={!canEditSelectedOrder}>
                     {taskCatalog.map((task) => <MenuItem key={task.id} value={task.id}>{task.name}</MenuItem>)}
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <TextField select label="Operario" value={taskForm.operator} onChange={(e) => setTaskForm((c) => ({ ...c, operator: e.target.value }))} required fullWidth>
+                  <TextField select label="Operario" value={taskForm.operator} onChange={(e) => setTaskForm((c) => ({ ...c, operator: e.target.value }))} required fullWidth disabled={!canEditSelectedOrder}>
                     {operators.map((operator) => <MenuItem key={operator.id} value={operator.id}>{operator.full_name}</MenuItem>)}
                   </TextField>
                 </Grid>
-                <Grid item xs={6} md={2}><TextField type="number" label="Horas" value={taskForm.estimated_hours} onChange={(e) => setTaskForm((c) => ({ ...c, estimated_hours: Number(e.target.value) }))} fullWidth inputProps={{ min: 0 }} /></Grid>
-                <Grid item xs={6} md={2}><TextField type="number" label="Min" value={taskForm.estimated_minutes_part} onChange={(e) => setTaskForm((c) => ({ ...c, estimated_minutes_part: Number(e.target.value) }))} fullWidth inputProps={{ min: 0, max: 59 }} /></Grid>
-                <Grid item xs={12} md={3}><TextField type="number" label="Costo mano de obra" value={taskForm.labor_cost} onChange={(e) => setTaskForm((c) => ({ ...c, labor_cost: e.target.value }))} fullWidth inputProps={{ min: 0, step: "0.01" }} /></Grid>
-                <Grid item xs={12} md={2}><TextField type="number" label="Orden" value={taskForm.execution_order} onChange={(e) => setTaskForm((c) => ({ ...c, execution_order: Number(e.target.value) }))} fullWidth /></Grid>
-                <Grid item xs={12} md={4}><TextField label="Titulo en orden" value={taskForm.title} onChange={(e) => setTaskForm((c) => ({ ...c, title: e.target.value }))} fullWidth /></Grid>
-                <Grid item xs={12} md={4}><TextField label="Sector" value={taskForm.sector} onChange={(e) => setTaskForm((c) => ({ ...c, sector: e.target.value }))} fullWidth /></Grid>
-                <Grid item xs={12} md={3}><Button variant="contained" fullWidth sx={{ height: 40 }} onClick={() => taskMutation.mutate()} disabled={!taskForm.task_template || !taskForm.operator || taskMutation.isPending}>Agregar tarea</Button></Grid>
+                <Grid item xs={6} md={2}><TextField type="number" label="Horas" value={taskForm.estimated_hours} onChange={(e) => setTaskForm((c) => ({ ...c, estimated_hours: Number(e.target.value) }))} fullWidth inputProps={{ min: 0 }} disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={6} md={2}><TextField type="number" label="Min" value={taskForm.estimated_minutes_part} onChange={(e) => setTaskForm((c) => ({ ...c, estimated_minutes_part: Number(e.target.value) }))} fullWidth inputProps={{ min: 0, max: 59 }} disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={12} md={3}><TextField type="number" label="Costo mano de obra" value={taskForm.labor_cost} onChange={(e) => setTaskForm((c) => ({ ...c, labor_cost: e.target.value }))} fullWidth inputProps={{ min: 0, step: "0.01" }} disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={12} md={2}><TextField type="number" label="Orden" value={taskForm.execution_order} onChange={(e) => setTaskForm((c) => ({ ...c, execution_order: Number(e.target.value) }))} fullWidth disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={12} md={4}><TextField label="Titulo en orden" value={taskForm.title} onChange={(e) => setTaskForm((c) => ({ ...c, title: e.target.value }))} fullWidth disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={12} md={4}><TextField label="Sector" value={taskForm.sector} onChange={(e) => setTaskForm((c) => ({ ...c, sector: e.target.value }))} fullWidth disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={12} md={3}><Button variant="contained" fullWidth sx={{ height: 40 }} onClick={() => taskMutation.mutate()} disabled={!canEditSelectedOrder || !taskForm.task_template || !taskForm.operator || taskMutation.isPending}>Agregar tarea</Button></Grid>
               </Grid>
               <Table size="small" sx={{ mt: 2 }}>
                 <TableHead><TableRow><TableCell>Tarea</TableCell><TableCell>Operario</TableCell><TableCell>Tiempo</TableCell><TableCell>Costo</TableCell><TableCell>Sector</TableCell><TableCell>Estado</TableCell><TableCell align="right">Acciones</TableCell></TableRow></TableHead>
-                <TableBody>{(tasksQuery.data || []).map((task) => <TableRow key={task.id}><TableCell><Typography fontWeight={700}>{task.title}</Typography><Typography variant="caption" color="text.secondary">{task.task_template_name || "Manual"}</Typography></TableCell><TableCell>{task.operator_name || "Sin asignar"}</TableCell><TableCell>{formatMinutes(task.estimated_minutes)}</TableCell><TableCell>{moneyFormatter.format(Number(task.labor_cost || 0))}</TableCell><TableCell>{task.sector || "-"}</TableCell><TableCell>{task.status}</TableCell><TableCell align="right"><Tooltip title="Cerrar tarea terminada"><span><IconButton color="success" disabled={task.status === "completed" || completeTaskMutation.isPending} onClick={() => completeTaskMutation.mutate(task.id)}><CheckCircleIcon /></IconButton></span></Tooltip></TableCell></TableRow>)}</TableBody>
+                <TableBody>{(tasksQuery.data || []).map((task) => <TableRow key={task.id}><TableCell><Typography fontWeight={700}>{task.title}</Typography><Typography variant="caption" color="text.secondary">{task.task_template_name || "Manual"}</Typography></TableCell><TableCell>{task.operator_name || "Sin asignar"}</TableCell><TableCell>{formatMinutes(task.estimated_minutes)}</TableCell><TableCell>{moneyFormatter.format(Number(task.labor_cost || 0))}</TableCell><TableCell>{task.sector || "-"}</TableCell><TableCell>{task.status}</TableCell><TableCell align="right"><Tooltip title="Cerrar tarea terminada"><span><IconButton color="success" disabled={!canEditSelectedOrder || task.status === "completed" || completeTaskMutation.isPending} onClick={() => completeTaskMutation.mutate(task.id)}><CheckCircleIcon /></IconButton></span></Tooltip></TableCell></TableRow>)}</TableBody>
               </Table>
             </Box>
 
@@ -292,10 +393,10 @@ export default function WorkOrdersPage() {
               <Typography variant="h6" gutterBottom>Repuestos</Typography>
               {partMutation.isError && <Alert severity="error" sx={{ mb: 2 }}>{getApiErrorMessage(partMutation.error)}</Alert>}
               <Grid container spacing={2}>
-                <Grid item xs={12} md={5}><TextField select label="Repuesto" value={partForm.part} onChange={updatePartSelection} fullWidth>{partsCatalog.map((part) => <MenuItem key={part.id} value={part.id}>{part.code} - {part.name}</MenuItem>)}</TextField></Grid>
-                <Grid item xs={6} md={2}><TextField type="number" label="Cantidad" value={partForm.quantity} onChange={(e) => setPartForm((c) => ({ ...c, quantity: e.target.value }))} fullWidth inputProps={{ min: 0.01, step: "0.01" }} /></Grid>
-                <Grid item xs={6} md={2}><TextField type="number" label="Costo unit." value={partForm.unit_cost} onChange={(e) => setPartForm((c) => ({ ...c, unit_cost: e.target.value }))} fullWidth inputProps={{ min: 0, step: "0.01" }} /></Grid>
-                <Grid item xs={12} md={3}><Button variant="outlined" fullWidth sx={{ height: 40 }} disabled={!partForm.part || partMutation.isPending} onClick={() => partMutation.mutate()}>Agregar repuesto</Button></Grid>
+                <Grid item xs={12} md={5}><TextField select label="Repuesto" value={partForm.part} onChange={updatePartSelection} fullWidth disabled={!canEditSelectedOrder}>{partsCatalog.map((part) => <MenuItem key={part.id} value={part.id}>{part.code} - {part.name}</MenuItem>)}</TextField></Grid>
+                <Grid item xs={6} md={2}><TextField type="number" label="Cantidad" value={partForm.quantity} onChange={(e) => setPartForm((c) => ({ ...c, quantity: e.target.value }))} fullWidth inputProps={{ min: 0.01, step: "0.01" }} disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={6} md={2}><TextField type="number" label="Costo unit." value={partForm.unit_cost} onChange={(e) => setPartForm((c) => ({ ...c, unit_cost: e.target.value }))} fullWidth inputProps={{ min: 0, step: "0.01" }} disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={12} md={3}><Button variant="outlined" fullWidth sx={{ height: 40 }} disabled={!canEditSelectedOrder || !partForm.part || partMutation.isPending} onClick={() => partMutation.mutate()}>Agregar repuesto</Button></Grid>
               </Grid>
               <Table size="small" sx={{ mt: 2 }}>
                 <TableHead><TableRow><TableCell>Codigo</TableCell><TableCell>Repuesto</TableCell><TableCell>Cantidad</TableCell><TableCell>Total</TableCell></TableRow></TableHead>
@@ -307,10 +408,10 @@ export default function WorkOrdersPage() {
               <Typography variant="h6" gutterBottom>Materiales</Typography>
               {materialMutation.isError && <Alert severity="error" sx={{ mb: 2 }}>{getApiErrorMessage(materialMutation.error)}</Alert>}
               <Grid container spacing={2}>
-                <Grid item xs={12} md={5}><TextField select label="Material" value={materialForm.material} onChange={updateMaterialSelection} fullWidth>{materialsCatalog.map((material) => <MenuItem key={material.id} value={material.id}>{material.code} - {material.name}</MenuItem>)}</TextField></Grid>
-                <Grid item xs={6} md={2}><TextField type="number" label="Cantidad" value={materialForm.quantity} onChange={(e) => setMaterialForm((c) => ({ ...c, quantity: e.target.value }))} fullWidth inputProps={{ min: 0.01, step: "0.01" }} /></Grid>
-                <Grid item xs={6} md={2}><TextField type="number" label="Costo unit." value={materialForm.unit_cost} onChange={(e) => setMaterialForm((c) => ({ ...c, unit_cost: e.target.value }))} fullWidth inputProps={{ min: 0, step: "0.01" }} /></Grid>
-                <Grid item xs={12} md={3}><Button variant="outlined" fullWidth sx={{ height: 40 }} disabled={!materialForm.material || materialMutation.isPending} onClick={() => materialMutation.mutate()}>Agregar material</Button></Grid>
+                <Grid item xs={12} md={5}><TextField select label="Material" value={materialForm.material} onChange={updateMaterialSelection} fullWidth disabled={!canEditSelectedOrder}>{materialsCatalog.map((material) => <MenuItem key={material.id} value={material.id}>{material.code} - {material.name}</MenuItem>)}</TextField></Grid>
+                <Grid item xs={6} md={2}><TextField type="number" label="Cantidad" value={materialForm.quantity} onChange={(e) => setMaterialForm((c) => ({ ...c, quantity: e.target.value }))} fullWidth inputProps={{ min: 0.01, step: "0.01" }} disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={6} md={2}><TextField type="number" label="Costo unit." value={materialForm.unit_cost} onChange={(e) => setMaterialForm((c) => ({ ...c, unit_cost: e.target.value }))} fullWidth inputProps={{ min: 0, step: "0.01" }} disabled={!canEditSelectedOrder} /></Grid>
+                <Grid item xs={12} md={3}><Button variant="outlined" fullWidth sx={{ height: 40 }} disabled={!canEditSelectedOrder || !materialForm.material || materialMutation.isPending} onClick={() => materialMutation.mutate()}>Agregar material</Button></Grid>
               </Grid>
               <Table size="small" sx={{ mt: 2 }}>
                 <TableHead><TableRow><TableCell>Codigo</TableCell><TableCell>Material</TableCell><TableCell>Cantidad</TableCell><TableCell>Total</TableCell></TableRow></TableHead>

@@ -14,6 +14,7 @@ class TaskTemplateFilter(django_filters.FilterSet):
 
 class WorkOrderFilter(django_filters.FilterSet):
     delayed = django_filters.BooleanFilter(method="filter_delayed")
+    is_closed = django_filters.BooleanFilter(method="filter_is_closed")
     estimated_delivery_from = django_filters.DateFilter(field_name="estimated_delivery_date", lookup_expr="gte")
     estimated_delivery_to = django_filters.DateFilter(field_name="estimated_delivery_date", lookup_expr="lte")
 
@@ -33,7 +34,12 @@ class WorkOrderFilter(django_filters.FilterSet):
             return queryset
         return queryset.filter(
             estimated_delivery_date__lt=timezone.now().date(),
-        ).exclude(status__in=["delivered", "cancelled"])
+        ).exclude(status__in=["delivered", "closed", "cancelled"])
+
+    def filter_is_closed(self, queryset, name, value):
+        if value:
+            return queryset.filter(status="closed")
+        return queryset.exclude(status="closed")
 
 
 class WorkOrderTaskFilter(django_filters.FilterSet):
