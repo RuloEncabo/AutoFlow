@@ -70,7 +70,7 @@ export default function Topbar({ drawerWidth, onMenuClick, sidebarCollapsed }) {
   );
 
   const topbarTitle = "Gestión integral";
-  const topbarSubtitle = "Taller automotor, turnos y órdenes";
+  const topbarSubtitle = "Taller automotor";
 
   return (
     <AppBar

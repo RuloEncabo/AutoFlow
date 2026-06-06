@@ -76,7 +76,7 @@ export default function Sidebar({ drawerWidth, collapsedWidth, collapsed = false
       </List>
       <Box mt="auto" px={isCollapsed ? 1 : 3} py={2} textAlign={isCollapsed ? "center" : "left"}>
         <Typography variant="caption" color="customColors.navTextMuted">
-          {isCollapsed ? "v0.1" : "AutoFlow v0.1.0"}
+          {isCollapsed ? "AutoFlow" : "AutoFlow v0.1.0"}
         </Typography>
       </Box>
     </Box>
