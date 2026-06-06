@@ -26,7 +26,7 @@ export const navigation = [
   { label: "Turnos", path: "/appointments", icon: CalendarMonthIcon, roles: [ROLES.ADMIN] },
   { label: "Recepcion", path: "/reception", icon: FactCheckOutlinedIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Ordenes", path: "/work-orders", icon: FactCheckIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
-  { label: "Insumos y Repuestos", path: "/inventory", icon: InventoryIcon, roles: [ROLES.ADMIN] },
+  { label: "Repuestos E Insumos", path: "/inventory", icon: InventoryIcon, roles: [ROLES.ADMIN] },
   { label: "Facturacion", path: "/billing", icon: ReceiptLongIcon, roles: [ROLES.ADMIN, ROLES.ADMINISTRATION] },
   { label: "TV taller", path: "/tv-dashboard", icon: MonitorIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Auditoria", path: "/audit", icon: HistoryIcon, roles: [ROLES.ADMIN] },
