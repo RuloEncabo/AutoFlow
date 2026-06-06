@@ -6,6 +6,11 @@ export async function listWorkOrders(params = {}) {
   return response.data;
 }
 
+export async function getWorkOrder(id) {
+  const response = await apiClient.get(`/work-orders/${id}/`);
+  return response.data;
+}
+
 export async function createWorkOrder(payload) {
   const response = await apiClient.post("/work-orders/", payload);
   return response.data;
