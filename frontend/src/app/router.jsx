@@ -10,6 +10,7 @@ import ForgotPasswordPage from "../pages/login/ForgotPasswordPage.jsx";
 import LoginPage from "../pages/login/LoginPage.jsx";
 import ResetPasswordPage from "../pages/login/ResetPasswordPage.jsx";
 import DashboardPage from "../pages/dashboard/DashboardPage.jsx";
+import FinancialDashboardPage from "../pages/dashboard/FinancialDashboardPage.jsx";
 import InventoryPage from "../pages/inventory/InventoryPage.jsx";
 import OperatorsPage from "../pages/operators/OperatorsPage.jsx";
 import ReceptionPage from "../pages/reception/ReceptionPage.jsx";
@@ -46,8 +47,10 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: "dashboard", element: withRoles(<DashboardPage />, [ROLES.ADMIN, ROLES.OPERATIVE, ROLES.ADMINISTRATION]) },
+      { index: true, element: <Navigate to="/dashboard-operativo" replace /> },
+      { path: "dashboard", element: <Navigate to="/dashboard-operativo" replace /> },
+      { path: "dashboard-operativo", element: withRoles(<DashboardPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
+      { path: "dashboard-financiero", element: withRoles(<FinancialDashboardPage />, [ROLES.ADMIN, ROLES.ADMINISTRATION]) },
       { path: "appointments", element: withRoles(<AppointmentsPage />, [ROLES.ADMIN]) },
       { path: "reception", element: withRoles(<ReceptionPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
       { path: "clients", element: withRoles(<ClientsPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
@@ -65,6 +68,6 @@ export const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/dashboard" replace />,
+    element: <Navigate to="/dashboard-operativo" replace />,
   },
 ]);

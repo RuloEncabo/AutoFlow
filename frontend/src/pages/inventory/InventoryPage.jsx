@@ -388,7 +388,7 @@ export default function InventoryPage() {
       const exportFn = tab === "parts" ? exportParts : exportMaterials;
       await exportFn(withItems);
     } catch (error) {
-      setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo exportar inventario.") });
+      setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo exportar insumos y repuestos.") });
     }
   };
 
@@ -396,7 +396,7 @@ export default function InventoryPage() {
     <Stack spacing={3}>
       <Box display="flex" justifyContent="space-between" gap={2} flexWrap="wrap">
         <Box>
-          <Typography variant="h4">Inventario</Typography>
+          <Typography variant="h4">Insumos y Repuestos</Typography>
           <Typography color="text.secondary">
             Repuestos, materiales, familias, stock y codigos escaneables.
           </Typography>

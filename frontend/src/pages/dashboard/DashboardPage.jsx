@@ -4,7 +4,6 @@ import CarRepairIcon from "@mui/icons-material/CarRepair";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import MonitorIcon from "@mui/icons-material/Monitor";
-import PaidIcon from "@mui/icons-material/Paid";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useQuery } from "@tanstack/react-query";
@@ -26,12 +25,6 @@ import { getApiErrorMessage } from "../../api/errorUtils.js";
 import { getHealth } from "../../api/healthApi.js";
 import StatCard from "../../components/StatCard.jsx";
 import StatusChip from "../../components/StatusChip.jsx";
-
-const moneyFormatter = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-  maximumFractionDigits: 0,
-});
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
@@ -79,7 +72,7 @@ export default function DashboardPage() {
       color: "warning",
     },
     {
-      title: "Stock critico",
+      title: "Insumos criticos",
       value: data?.stock?.critical_total ?? 0,
       helper: `${data?.stock?.critical_parts ?? 0} repuestos, ${data?.stock?.critical_materials ?? 0} materiales`,
       icon: <InventoryIcon />,
@@ -92,13 +85,6 @@ export default function DashboardPage() {
       icon: <BuildIcon />,
       color: "warning",
     },
-    {
-      title: "Facturacion mes",
-      value: moneyFormatter.format(data?.billing?.month_total ?? 0),
-      helper: `${data?.billing?.pending_count ?? 0} facturas pendientes`,
-      icon: <PaidIcon />,
-      color: "primary",
-    },
   ];
 
   return (
@@ -107,7 +93,7 @@ export default function DashboardPage() {
         <Box>
           <Typography variant="h4">Dashboard operativo</Typography>
           <Typography color="text.secondary">
-            Indicadores reales de taller, turnos, stock, facturacion y avance operativo.
+            Indicadores reales de taller, turnos, insumos, repuestos y avance operativo.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>

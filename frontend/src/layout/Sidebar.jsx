@@ -8,6 +8,7 @@ import {
   ListItemIcon,
   ListItemText,
   Toolbar,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useSelector } from "react-redux";
@@ -16,20 +17,21 @@ import LogoMark from "../components/LogoMark.jsx";
 import { navigation } from "./navigation.js";
 import { hasAllowedRole } from "../auth/roles.js";
 
-export default function Sidebar({ drawerWidth, mobileOpen, onClose }) {
+export default function Sidebar({ drawerWidth, collapsedWidth, collapsed = false, mobileOpen, onClose }) {
   const user = useSelector((state) => state.auth.user);
   const visibleNavigation = navigation.filter((item) => hasAllowedRole(user, item.roles));
+  const desktopWidth = collapsed ? collapsedWidth : drawerWidth;
 
-  const content = (
+  const content = (isCollapsed = false) => (
     <Box height="100%" display="flex" flexDirection="column">
-      <Toolbar sx={{ px: 3 }}>
-        <LogoMark />
+      <Toolbar sx={{ px: isCollapsed ? 2 : 3, justifyContent: isCollapsed ? "center" : "flex-start" }}>
+        <LogoMark compact={isCollapsed} />
       </Toolbar>
       <Divider sx={{ borderColor: "customColors.navBorder" }} />
-      <List sx={{ px: 2, py: 2 }}>
+      <List sx={{ px: isCollapsed ? 1 : 2, py: 2 }}>
         {visibleNavigation.map((item) => {
           const Icon = item.icon;
-          return (
+          const button = (
             <ListItemButton
               key={item.path}
               component={NavLink}
@@ -38,6 +40,8 @@ export default function Sidebar({ drawerWidth, mobileOpen, onClose }) {
               sx={{
                 my: 0.4,
                 borderRadius: 2,
+                minHeight: 44,
+                justifyContent: isCollapsed ? "center" : "flex-start",
                 color: "customColors.navTextMuted",
                 "&:hover": {
                   color: "customColors.navText",
@@ -52,20 +56,27 @@ export default function Sidebar({ drawerWidth, mobileOpen, onClose }) {
                 },
               }}
             >
-              <ListItemIcon sx={{ minWidth: 40, color: "customColors.navTextMuted" }}>
+              <ListItemIcon sx={{ minWidth: isCollapsed ? 0 : 40, color: "customColors.navTextMuted", justifyContent: "center" }}>
                 <Icon fontSize="small" />
               </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                primaryTypographyProps={{ variant: "button", fontWeight: 700 }}
-              />
+              {!isCollapsed && (
+                <ListItemText
+                  primary={item.label}
+                  primaryTypographyProps={{ variant: "button", fontWeight: 700 }}
+                />
+              )}
             </ListItemButton>
           );
+          return isCollapsed ? (
+            <Tooltip key={item.path} title={item.label} placement="right">
+              {button}
+            </Tooltip>
+          ) : button;
         })}
       </List>
-      <Box mt="auto" px={3} py={2}>
+      <Box mt="auto" px={isCollapsed ? 1 : 3} py={2} textAlign={isCollapsed ? "center" : "left"}>
         <Typography variant="caption" color="customColors.navTextMuted">
-          AutoFlow v0.1.0
+          {isCollapsed ? "v0.1" : "AutoFlow v0.1.0"}
         </Typography>
       </Box>
     </Box>
@@ -87,23 +98,25 @@ export default function Sidebar({ drawerWidth, mobileOpen, onClose }) {
           },
         }}
       >
-        {content}
+        {content(false)}
       </Drawer>
       <Drawer
         variant="permanent"
         sx={{
           display: { xs: "none", lg: "block" },
           "& .MuiDrawer-paper": {
-            width: drawerWidth,
+            width: desktopWidth,
             borderRight: 0,
             bgcolor: "customColors.navBg",
             color: "customColors.navText",
             boxShadow: "0px 4px 18px 0px rgba(47, 43, 61, 0.1)",
+            overflowX: "hidden",
+            transition: "width 180ms ease",
           },
         }}
         open
       >
-        {content}
+        {content(collapsed)}
       </Drawer>
     </>
   );
