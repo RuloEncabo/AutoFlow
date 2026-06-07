@@ -48,12 +48,31 @@ function normalizeList(data) {
 
 function statusLabel(value) {
   const labels = {
+    scheduled: "Programado",
+    received: "Recibido",
+    estimating: "Presupuestando",
+    waiting_parts: "Esperando piezas",
+    in_repair: "En reparacion",
+    in_paint: "En pintura",
+    finished: "Terminado",
+    delivered: "Entregado",
+    closed: "Cerrada",
     pending: "Pendiente",
     approved: "Aprobado",
     rejected: "Rechazado",
     partial: "Parcial",
     paid: "Pagado",
     cancelled: "Cancelado",
+  };
+  return labels[value] || value || "-";
+}
+
+function priorityLabel(value) {
+  const labels = {
+    low: "Baja",
+    normal: "Normal",
+    high: "Alta",
+    urgent: "Urgente",
   };
   return labels[value] || value || "-";
 }
@@ -157,18 +176,25 @@ function Header({ profile }) {
 }
 
 function SummaryCard({ documentType, number, issueDate, total }) {
+  const labels = {
+    invoice: ["Factura No:", "Fecha:", "Gran Total:"],
+    estimate: ["Presupuesto No:", "Fecha:", "Total:"],
+    work_order: ["Orden No:", "Ingreso:", "Subtotal:"],
+  };
+  const [numberLabel, dateLabel, totalLabel] = labels[documentType] || labels.estimate;
+
   return (
     <View style={styles.summaryCard}>
       <View style={styles.summaryCell}>
-        <Text style={styles.summaryLabel}>{documentType === "invoice" ? "Factura No:" : "Presupuesto No:"}</Text>
+        <Text style={styles.summaryLabel}>{numberLabel}</Text>
         <Text style={styles.summaryValue}>{number}</Text>
       </View>
       <View style={styles.summaryCell}>
-        <Text style={styles.summaryLabel}>Fecha:</Text>
+        <Text style={styles.summaryLabel}>{dateLabel}</Text>
         <Text style={styles.summaryValue}>{date(issueDate)}</Text>
       </View>
       <View style={styles.summaryCell}>
-        <Text style={styles.summaryLabel}>Total:</Text>
+        <Text style={styles.summaryLabel}>{totalLabel}</Text>
         <Text style={styles.summaryValue}>{money(total)}</Text>
       </View>
     </View>
@@ -200,22 +226,38 @@ function ItemsTable({ items }) {
 }
 
 function PaymentBlock({ documentType, record, workOrder, profile }) {
-  const rows = documentType === "invoice"
-    ? [
-        ["Estado:", statusLabel(record.payment_status)],
-        ["Orden de trabajo:", workOrder.order_number || record.work_order_number],
-        ["Presupuesto:", record.estimate ? "Asociado" : "Sin presupuesto asociado"],
-      ]
-    : [
-        ["Contacto:", profile.email || profile.email_from_address || profile.phone || "-"],
-        ["Orden de trabajo:", workOrder.order_number || record.work_order_number],
-        ["Validez:", "Valores sujetos a disponibilidad de repuestos y materiales."],
-        ["Entrega estimada:", date(workOrder.estimated_delivery_date)],
-      ];
+  let title = "Medios y condiciones:";
+  let rows = [
+    ["Contacto:", profile.email || profile.email_from_address || profile.phone || "-"],
+    ["Orden de trabajo:", workOrder.order_number || record.work_order_number],
+    ["Validez:", "Valores sujetos a disponibilidad de repuestos y materiales."],
+    ["Entrega estimada:", date(workOrder.estimated_delivery_date)],
+  ];
+
+  if (documentType === "invoice") {
+    title = "Datos de pago:";
+    rows = [
+      ["Estado:", statusLabel(record.payment_status)],
+      ["Orden de trabajo:", workOrder.order_number || record.work_order_number],
+      ["Presupuesto:", record.estimate ? "Asociado" : "Sin presupuesto asociado"],
+    ];
+  }
+
+  if (documentType === "work_order") {
+    title = "Datos de la orden:";
+    rows = [
+      ["Estado:", statusLabel(workOrder.status)],
+      ["Prioridad:", priorityLabel(workOrder.priority)],
+      ["Entrega estimada:", date(workOrder.estimated_delivery_date)],
+      ["Avance:", `${workOrder.tasks_completed || 0}/${workOrder.tasks_total || 0} tareas - ${workOrder.progress_percent || 0}%`],
+      ["Descripcion:", workOrder.description || "-"],
+      ["Observaciones:", workOrder.notes || "-"],
+    ];
+  }
 
   return (
     <View style={styles.paymentBlock}>
-      <Text style={styles.blockTitle}>{documentType === "invoice" ? "Datos de pago:" : "Medios y condiciones:"}</Text>
+      <Text style={styles.blockTitle}>{title}</Text>
       {rows.map(([label, value]) => (
         <View key={label} style={styles.blockRow}>
           <Text style={styles.blockLabel}>{label}</Text>
@@ -228,19 +270,33 @@ function PaymentBlock({ documentType, record, workOrder, profile }) {
 
 function TotalsBlock({ documentType, record }) {
   const baseSubtotal = Number(record.labor_amount || 0) + Number(record.materials_amount || 0) + Number(record.parts_amount || 0);
-  const rows = documentType === "invoice"
-    ? [
-        ["Sub Total", record.subtotal, "dark"],
-        [`Descuento ${record.discount_percent || 0}%`, record.discount_amount, "red"],
-        [`IVA ${record.tax_percent || 0}%`, record.tax_amount, "dark"],
-        ["Cobrado", record.paid_amount, "dark"],
-        ["Saldo", record.balance_due, "dark"],
-      ]
-    : [
-        ["Sub Total", baseSubtotal, "dark"],
-        ["Adicional", record.extra_amount, "dark"],
-      ];
-  const grandTotal = documentType === "invoice" ? record.total : record.total_amount;
+  let rows = [
+    ["Sub Total", baseSubtotal, "dark"],
+    ["Adicional", record.extra_amount, "dark"],
+  ];
+  let grandLabel = "Gran Total";
+  let grandTotal = record.total_amount;
+
+  if (documentType === "invoice") {
+    rows = [
+      ["Sub Total", record.subtotal, "dark"],
+      [`Descuento ${record.discount_percent || 0}%`, record.discount_amount, "red"],
+      [`IVA ${record.tax_percent || 0}%`, record.tax_amount, "dark"],
+      ["Cobrado", record.paid_amount, "dark"],
+      ["Saldo", record.balance_due, "dark"],
+    ];
+    grandTotal = record.total;
+  }
+
+  if (documentType === "work_order") {
+    rows = [
+      ["Mano de obra", record.labor_amount, "dark"],
+      ["Materiales", record.materials_amount, "dark"],
+      ["Repuestos", record.parts_amount, "dark"],
+    ];
+    grandLabel = "Subtotal";
+    grandTotal = record.subtotal_amount;
+  }
 
   return (
     <View style={styles.totalsBlock}>
@@ -251,7 +307,7 @@ function TotalsBlock({ documentType, record }) {
         </View>
       ))}
       <View style={styles.grandRow}>
-        <Text style={styles.grandLabel}>Gran Total</Text>
+        <Text style={styles.grandLabel}>{grandLabel}</Text>
         <Text style={styles.grandValue}>{money(grandTotal)}</Text>
       </View>
     </View>
@@ -259,10 +315,36 @@ function TotalsBlock({ documentType, record }) {
 }
 
 function BillingPdfDocument({ documentType, record, workOrder, tasks, parts, materials, profile }) {
-  const title = documentType === "invoice" ? (profile.invoice_header_title || "Factura") : (profile.estimate_header_title || "Presupuesto");
-  const number = documentType === "invoice" ? record.invoice_number : record.work_order_number;
-  const issueDate = documentType === "invoice" ? record.issued_at : record.created_at;
-  const total = documentType === "invoice" ? record.total : record.total_amount;
+  const documentConfig = {
+    invoice: {
+      title: profile.invoice_header_title || "Factura",
+      number: record.invoice_number,
+      issueDate: record.issued_at,
+      total: record.total,
+      recipientLabel: "Factura a:",
+      signatureLabel: "Responsable administrativo",
+      status: statusLabel(record.payment_status),
+    },
+    estimate: {
+      title: profile.estimate_header_title || "Presupuesto",
+      number: record.work_order_number,
+      issueDate: record.created_at,
+      total: record.total_amount,
+      recipientLabel: "Presupuesto a:",
+      signatureLabel: "Conformidad del cliente",
+      status: statusLabel(record.status),
+    },
+    work_order: {
+      title: profile.order_header_title || "Orden de trabajo",
+      number: workOrder.order_number,
+      issueDate: workOrder.entry_date,
+      total: workOrder.subtotal_amount,
+      recipientLabel: "Orden a:",
+      signatureLabel: "Conformidad del cliente",
+      status: statusLabel(workOrder.status),
+    },
+  };
+  const config = documentConfig[documentType] || documentConfig.estimate;
   const items = buildItems({
     tasks,
     parts,
@@ -272,22 +354,22 @@ function BillingPdfDocument({ documentType, record, workOrder, tasks, parts, mat
   });
 
   return (
-    <Document title={`${title} ${number}`}>
+    <Document title={`${config.title} ${config.number}`}>
       <Page size="A4" style={styles.page}>
         <Header profile={profile} />
 
         <View style={styles.content}>
           <View style={styles.intro}>
             <View style={styles.recipient}>
-              <Text style={styles.recipientLabel}>{documentType === "invoice" ? "Factura a:" : "Presupuesto a:"}</Text>
+              <Text style={styles.recipientLabel}>{config.recipientLabel}</Text>
               <Text style={styles.recipientName}>{record.client_name || workOrder.client_name || "-"}</Text>
               <Text style={styles.recipientText}>{workOrder.vehicle_label || "-"}</Text>
               <Text style={styles.recipientText}>Orden: {workOrder.order_number || record.work_order_number}</Text>
-              <Text style={styles.recipientText}>Estado: {statusLabel(documentType === "invoice" ? record.payment_status : record.status)}</Text>
+              <Text style={styles.recipientText}>Estado: {config.status}</Text>
             </View>
             <View style={styles.titleArea}>
-              <Text style={styles.title}>{title.toUpperCase()}</Text>
-              <SummaryCard documentType={documentType} number={number} issueDate={issueDate} total={total} />
+              <Text style={styles.title}>{config.title.toUpperCase()}</Text>
+              <SummaryCard documentType={documentType} number={config.number} issueDate={config.issueDate} total={config.total} />
             </View>
           </View>
 
@@ -300,7 +382,7 @@ function BillingPdfDocument({ documentType, record, workOrder, tasks, parts, mat
 
           <View style={styles.signature}>
             <Text style={styles.signatureText}>Firma</Text>
-            <Text style={styles.signatureLabel}>{documentType === "invoice" ? "Responsable administrativo" : "Conformidad del cliente"}</Text>
+            <Text style={styles.signatureLabel}>{config.signatureLabel}</Text>
           </View>
         </View>
 
@@ -332,6 +414,30 @@ export async function downloadBillingPdf({ documentType, record, filename }) {
       documentType={documentType}
       record={record}
       workOrder={workOrder}
+      tasks={tasks}
+      parts={parts}
+      materials={materials}
+      profile={profile}
+    />,
+  ).toBlob();
+
+  downloadBlob(blob, filename);
+}
+
+export async function downloadWorkOrderPdf({ workOrder, filename }) {
+  const [profile, fullWorkOrder, tasks, parts, materials] = await Promise.all([
+    getWorkshopProfile(),
+    getWorkOrder(workOrder.id),
+    listWorkOrderTasks(workOrder.id),
+    listWorkOrderParts({ work_order: workOrder.id, page_size: 100 }),
+    listWorkOrderMaterials({ work_order: workOrder.id, page_size: 100 }),
+  ]);
+
+  const blob = await pdf(
+    <BillingPdfDocument
+      documentType="work_order"
+      record={fullWorkOrder}
+      workOrder={fullWorkOrder}
       tasks={tasks}
       parts={parts}
       materials={materials}

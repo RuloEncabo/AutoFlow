@@ -30,11 +30,12 @@ import { listTasks as listTaskCatalog } from "../../api/tasksApi.js";
 import { listVehicles } from "../../api/vehiclesApi.js";
 import {
   changeWorkOrderStatus, completeWorkOrderTask, createWorkOrder, createWorkOrderTask, deleteWorkOrder,
-  downloadWorkOrderPdf, exportWorkOrders, listWorkOrders, listWorkOrderTasks, updateWorkOrder,
+  exportWorkOrders, listWorkOrders, listWorkOrderTasks, updateWorkOrder,
 } from "../../api/workOrdersApi.js";
 import { ROLES } from "../../auth/roles.js";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
 import StatusChip from "../../components/StatusChip.jsx";
+import { downloadWorkOrderPdf } from "../../pdf/billingPdf.jsx";
 
 const statuses = [
   ["scheduled", "Programado"], ["received", "Recibido"], ["estimating", "Presupuestando"],
@@ -241,6 +242,14 @@ export default function WorkOrdersPage() {
     }
   };
 
+  const handleDownloadPdf = async (order) => {
+    try {
+      await downloadWorkOrderPdf({ workOrder: order, filename: `orden_${order.order_number}.pdf` });
+    } catch (error) {
+      setToast({ severity: "error", message: getApiErrorMessage(error, "No se pudo generar el PDF de la orden.") });
+    }
+  };
+
   const renderOrderRows = (tableRows, emptyMessage, isLoading) => (
     <>
       {tableRows.map((order) => {
@@ -256,7 +265,7 @@ export default function WorkOrdersPage() {
             <TableCell sx={{ minWidth: 160 }}><Typography variant="body2">{order.tasks_completed}/{order.tasks_total} tareas</Typography><LinearProgress variant="determinate" value={order.progress_percent || 0} sx={{ height: 8, borderRadius: 4 }} /></TableCell>
             <TableCell>{moneyFormatter.format(Number(order.subtotal_amount || 0))}</TableCell>
             <TableCell align="right">
-              <Tooltip title="Descargar PDF"><IconButton color="primary" onClick={() => downloadWorkOrderPdf(order.id, `${order.order_number}.pdf`)}><PictureAsPdfIcon /></IconButton></Tooltip>
+              <Tooltip title="Descargar PDF"><IconButton color="primary" onClick={() => handleDownloadPdf(order)}><PictureAsPdfIcon /></IconButton></Tooltip>
               <Tooltip title={editable ? "Tareas e insumos" : "Ver detalle"}>
                 <IconButton onClick={() => openTaskDialog(order)}><AssignmentIcon /></IconButton>
               </Tooltip>
