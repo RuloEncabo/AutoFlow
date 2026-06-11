@@ -33,4 +33,10 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
-        value: gpt-4o-mini
+        value: gpt-4o
+      - key: CHATBOT_RATE_LIMIT_ADMIN
+        value: 60
+      - key: CHATBOT_RATE_LIMIT_USER
+        value: 30
+      - key: CHATBOT_RATE_LIMIT_WINDOW_SECONDS
+        value: 600

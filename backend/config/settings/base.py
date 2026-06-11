@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.accounts",
     "apps.audit",
+    "apps.chatbot",
     "apps.clients",
     "apps.vehicles",
     "apps.appointments",
@@ -225,7 +226,10 @@ MERCADOPAGO_NOTIFICATION_URL = os.getenv("MERCADOPAGO_NOTIFICATION_URL", "")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+CHATBOT_RATE_LIMIT_ADMIN = int(os.getenv("CHATBOT_RATE_LIMIT_ADMIN", "60"))
+CHATBOT_RATE_LIMIT_USER = int(os.getenv("CHATBOT_RATE_LIMIT_USER", "30"))
+CHATBOT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CHATBOT_RATE_LIMIT_WINDOW_SECONDS", "600"))
 
 LOG_DIR = Path(os.getenv("LOG_DIR", AUTOFLOW_ROOT / "logs"))
 LOG_DIR.mkdir(parents=True, exist_ok=True)
