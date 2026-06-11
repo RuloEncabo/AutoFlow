@@ -223,6 +223,10 @@ MERCADOPAGO_PUBLIC_KEY = os.getenv("MERCADOPAGO_PUBLIC_KEY", "")
 MERCADOPAGO_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "")
 MERCADOPAGO_NOTIFICATION_URL = os.getenv("MERCADOPAGO_NOTIFICATION_URL", "")
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
 LOG_DIR = Path(os.getenv("LOG_DIR", AUTOFLOW_ROOT / "logs"))
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 

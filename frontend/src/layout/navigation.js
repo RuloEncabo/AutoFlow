@@ -11,6 +11,7 @@ import EngineeringIcon from "@mui/icons-material/Engineering";
 import PaidIcon from "@mui/icons-material/Paid";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import SettingsIcon from "@mui/icons-material/Settings";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
@@ -19,6 +20,7 @@ import { ROLES } from "../auth/roles.js";
 export const navigation = [
   { label: "Dashboard operativo", path: "/dashboard-operativo", icon: DashboardIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Dashboard financiero", path: "/dashboard-financiero", icon: PaidIcon, roles: [ROLES.ADMIN, ROLES.ADMINISTRATION] },
+  { label: "App IA", path: "/ai-assistant", icon: SmartToyIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE, ROLES.ADMINISTRATION, ROLES.APP_USER] },
   { label: "Clientes", path: "/clients", icon: GroupsIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Vehiculos", path: "/vehicles", icon: CarRepairIcon, roles: [ROLES.ADMIN, ROLES.OPERATIVE] },
   { label: "Operarios", path: "/operators", icon: EngineeringIcon, roles: [ROLES.ADMIN] },

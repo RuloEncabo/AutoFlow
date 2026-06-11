@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import ProtectedRoute from "../auth/ProtectedRoute.jsx";
 import DashboardLayout from "../layout/DashboardLayout.jsx";
+import AiAssistantPage from "../pages/ai/AiAssistantPage.jsx";
 import AuditPage from "../pages/audit/AuditPage.jsx";
 import AppointmentsPage from "../pages/appointments/AppointmentsPage.jsx";
 import BillingPage from "../pages/billing/BillingPage.jsx";
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
       { path: "dashboard", element: <Navigate to="/dashboard-operativo" replace /> },
       { path: "dashboard-operativo", element: withRoles(<DashboardPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
       { path: "dashboard-financiero", element: withRoles(<FinancialDashboardPage />, [ROLES.ADMIN, ROLES.ADMINISTRATION]) },
+      { path: "ai-assistant", element: withRoles(<AiAssistantPage />, [ROLES.ADMIN, ROLES.OPERATIVE, ROLES.ADMINISTRATION, ROLES.APP_USER]) },
       { path: "appointments", element: withRoles(<AppointmentsPage />, [ROLES.ADMIN]) },
       { path: "reception", element: withRoles(<ReceptionPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
       { path: "clients", element: withRoles(<ClientsPage />, [ROLES.ADMIN, ROLES.OPERATIVE]) },
