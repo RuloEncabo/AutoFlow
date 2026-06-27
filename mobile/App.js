@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState } from "react";
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { clearTokens, getAccessToken } from "./src/api";
@@ -8,13 +8,67 @@ import InspectionScreen from "./src/screens/InspectionScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import { colors } from "./src/theme";
 
-export default function App() {
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <SafeAreaView style={styles.safe}>
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>No se pudo iniciar AutoFlow</Text>
+            <Text style={styles.errorText}>{String(this.state.error?.message || this.state.error)}</Text>
+            <TouchableOpacity style={styles.button} onPress={() => this.setState({ error: null })}>
+              <Text style={styles.buttonText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AutoFlowApp() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [ready, setReady] = useState(false);
   const [screen, setScreen] = useState("home");
 
   useEffect(() => {
-    getAccessToken().then((token) => setAuthenticated(Boolean(token)));
+    let mounted = true;
+    getAccessToken()
+      .then((token) => {
+        if (mounted) setAuthenticated(Boolean(token));
+      })
+      .catch(async () => {
+        await clearTokens();
+        if (mounted) setAuthenticated(false);
+      })
+      .finally(() => {
+        if (mounted) setReady(true);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  if (!ready) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>AutoFlow</Text>
+          <Text style={styles.text}>Iniciando aplicacion...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!authenticated) {
     return <LoginScreen onLogin={() => setAuthenticated(true)} />;
@@ -53,6 +107,14 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <AppErrorBoundary>
+      <AutoFlowApp />
+    </AppErrorBoundary>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: { backgroundColor: colors.blue, padding: 18, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -64,4 +126,9 @@ const styles = StyleSheet.create({
   card: { backgroundColor: "white", borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 16 },
   cardTitle: { fontSize: 18, fontWeight: "700", color: colors.text, marginBottom: 8 },
   text: { color: colors.muted, lineHeight: 20 },
+  button: { backgroundColor: colors.blue, borderRadius: 8, padding: 13, alignItems: "center", marginTop: 14 },
+  buttonText: { color: "white", fontWeight: "800" },
+  errorCard: { backgroundColor: "white", borderRadius: 10, borderWidth: 1, borderColor: colors.border, margin: 18, padding: 16 },
+  errorTitle: { color: colors.danger, fontSize: 18, fontWeight: "800", marginBottom: 8 },
+  errorText: { color: colors.text, lineHeight: 20 },
 });

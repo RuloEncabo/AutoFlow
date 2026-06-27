@@ -2,7 +2,7 @@
   "expo": {
     "name": "AutoFlow Mobile",
     "slug": "autoflow-mobile",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "platforms": ["android"],
     "android": {
